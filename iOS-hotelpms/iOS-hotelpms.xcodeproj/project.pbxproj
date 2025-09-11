@@ -6,13 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		7D6421642E70BA67006FE531 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 7D6421622E70BA67006FE531 /* README.md */; };
-		7D6421652E70BA67006FE531 /* PRODUCT.md in Resources */ = {isa = PBXBuildFile; fileRef = 7D6421612E70BA67006FE531 /* PRODUCT.md */; };
-		7D6421662E70BA67006FE531 /* TODO.md in Resources */ = {isa = PBXBuildFile; fileRef = 7D6421632E70BA67006FE531 /* TODO.md */; };
-		7D6421682E70BABC006FE531 /* CLAUDE.md in Resources */ = {isa = PBXBuildFile; fileRef = 7D6421672E70BABC006FE531 /* CLAUDE.md */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXContainerItemProxy section */
 		7D64213F2E70B75C006FE531 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -34,10 +27,6 @@
 		7D6421312E70B75C006FE531 /* iOS-hotelpms.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "iOS-hotelpms.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		7D64213E2E70B75C006FE531 /* iOS-hotelpmsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "iOS-hotelpmsTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		7D6421482E70B75C006FE531 /* iOS-hotelpmsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "iOS-hotelpmsUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		7D6421612E70BA67006FE531 /* PRODUCT.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = PRODUCT.md; sourceTree = "<group>"; };
-		7D6421622E70BA67006FE531 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
-		7D6421632E70BA67006FE531 /* TODO.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = TODO.md; sourceTree = "<group>"; };
-		7D6421672E70BABC006FE531 /* CLAUDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLAUDE.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -55,6 +44,12 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "iOS-hotelpmsUITests";
 			sourceTree = "<group>";
+		};
+		7DDA41972E7320DA001CB7A8 /* docs */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = docs;
+			path = ../docs;
+			sourceTree = SOURCE_ROOT;
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
@@ -86,10 +81,7 @@
 		7D6421282E70B75B006FE531 = {
 			isa = PBXGroup;
 			children = (
-				7D6421612E70BA67006FE531 /* PRODUCT.md */,
-				7D6421672E70BABC006FE531 /* CLAUDE.md */,
-				7D6421622E70BA67006FE531 /* README.md */,
-				7D6421632E70BA67006FE531 /* TODO.md */,
+				7DDA41972E7320DA001CB7A8 /* docs */,
 				7D6421332E70B75C006FE531 /* iOS-hotelpms */,
 				7D6421412E70B75C006FE531 /* iOS-hotelpmsTests */,
 				7D64214B2E70B75C006FE531 /* iOS-hotelpmsUITests */,
@@ -227,10 +219,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7D6421642E70BA67006FE531 /* README.md in Resources */,
-				7D6421652E70BA67006FE531 /* PRODUCT.md in Resources */,
-				7D6421682E70BABC006FE531 /* CLAUDE.md in Resources */,
-				7D6421662E70BA67006FE531 /* TODO.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

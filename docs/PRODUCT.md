@@ -14,7 +14,7 @@ We adopt **two workflows**:
 - **Flags**: overlays for exceptional states (maintenance, OOO, OOS, DND, lockout, VIP).  
 
 Front Desk has access to both workflows for flexibility.  
-
+checking if reference is working correctly
 ---
 
 ## 2. Scope (MVP & V1.1)

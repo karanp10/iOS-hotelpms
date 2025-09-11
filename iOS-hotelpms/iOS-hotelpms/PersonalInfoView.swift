@@ -1,36 +1,47 @@
 //
-//  LoginView.swift
-//  
+//  PersonalInfoView.swift
+//  iOS-hotelpms
 //
-//  Created by Karan Patel on 9/9/25.
+//  Created by Karan Patel on 9/11/25.
 //
 
 import SwiftUI
 
-struct LoginView: View {
+struct PersonalInfoView: View {
+    @State private var firstName = ""
+    @State private var lastName = ""
     @State private var email = ""
     @State private var password = ""
+    @State private var confirmPassword = ""
     @EnvironmentObject var navigationManager: NavigationManager
     
     var body: some View {
         GeometryReader { geometry in
-            HStack {
+            VStack {
                 Spacer()
                 
                 VStack(spacing: 32) {
-                    Spacer()
-                    
                     VStack(spacing: 16) {
-                        Text("Hotel PMS")
+                        Text("Personal Information")
                             .font(.largeTitle)
                             .fontWeight(.bold)
                         
-                        Text("Sign in to continue")
+                        Text("Tell us about yourself")
                             .font(.title2)
                             .foregroundColor(.secondary)
                     }
                     
                     VStack(spacing: 20) {
+                        HStack(spacing: 12) {
+                            TextField("First Name", text: $firstName)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(height: 44)
+                            
+                            TextField("Last Name", text: $lastName)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(height: 44)
+                        }
+                        
                         TextField("Email", text: $email)
                             .textFieldStyle(.roundedBorder)
                             .keyboardType(.emailAddress)
@@ -40,13 +51,22 @@ struct LoginView: View {
                         SecureField("Password", text: $password)
                             .textFieldStyle(.roundedBorder)
                             .frame(height: 44)
+                        
+                        SecureField("Confirm Password", text: $confirmPassword)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(height: 44)
                     }
                     
                     Button(action: {
-                        // Login action will go here
-                        print("Login tapped")
+                        let personalData = PersonalData(
+                            firstName: firstName,
+                            lastName: lastName,
+                            email: email,
+                            password: password
+                        )
+                        navigationManager.navigate(to: .hotelInfo(personalData: personalData))
                     }) {
-                        Text("Sign In")
+                        Text("Continue")
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -54,23 +74,6 @@ struct LoginView: View {
                             .background(Color.blue)
                             .cornerRadius(10)
                     }
-                    
-                    Button(action: {
-                        navigationManager.navigate(to: .personalInfo)
-                    }) {
-                        Text("Create Account")
-                            .font(.headline)
-                            .foregroundColor(.blue)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(Color.clear)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.blue, lineWidth: 2)
-                            )
-                    }
-                    
-                    Spacer()
                 }
                 .frame(width: min(400, geometry.size.width * 0.8))
                 .padding(40)
@@ -83,5 +86,5 @@ struct LoginView: View {
 }
 
 #Preview {
-    LoginView()
+    PersonalInfoView()
 }
