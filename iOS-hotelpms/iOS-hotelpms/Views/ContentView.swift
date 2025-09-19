@@ -12,6 +12,9 @@ enum NavigationDestination: Hashable {
     case personalInfo
     case hotelInfo(personalData: PersonalData)
     case accountSuccess(email: String)
+    case emailVerification(email: String)
+    case managerHotelSetup
+    case employeeJoin
 }
 
 struct PersonalData: Hashable {
@@ -37,6 +40,12 @@ struct ContentView: View {
                         HotelInfoView(personalData: personalData)
                     case .accountSuccess(let email):
                         AccountSuccessView(userEmail: email)
+                    case .emailVerification(let email):
+                        EmailVerificationView(userEmail: email)
+                    case .managerHotelSetup:
+                        ManagerHotelSetupView()
+                    case .employeeJoin:
+                        EmployeeJoinView()
                     }
                 }
         }

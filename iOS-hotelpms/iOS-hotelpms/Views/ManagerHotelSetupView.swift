@@ -1,35 +1,30 @@
-//
-//  HotelInfoView.swift
-//  iOS-hotelpms
-//
-//  Created by Karan Patel on 9/11/25.
-//
-
-//
-//  HotelInfoView.swift
-//  iOS-hotelpms
-//
-//  Created by Karan Patel on 9/11/25.
-//
-
 import SwiftUI
 
-struct HotelInfoView: View {
-    let personalData: PersonalData
+struct ManagerHotelSetupView: View {
     @State private var hotelName = ""
     @State private var address = ""
     @State private var city = ""
     @State private var state = ""
     @State private var zipCode = ""
     @State private var phoneNumber = ""
+    @State private var isLoading = false
+    @State private var showingAlert = false
+    @State private var alertTitle = ""
+    @State private var alertMessage = ""
     @EnvironmentObject var navigationManager: NavigationManager
+    
+    @StateObject private var databaseService = DatabaseService()
+    
+    private var isFormValid: Bool {
+        return !hotelName.trimmingCharacters(in: .whitespaces).isEmpty
+    }
     
     var body: some View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(spacing: 32) {
                     VStack(spacing: 16) {
-                        Text("Hotel Information")
+                        Text("Create Your Hotel")
                             .font(.largeTitle)
                             .fontWeight(.bold)
                         
@@ -84,18 +79,26 @@ struct HotelInfoView: View {
                         }
                         
                         Button(action: {
-                            // Here we would create the account and hotel with Supabase
-                            // For now, navigate to success screen
-                            navigationManager.navigate(to: .accountSuccess(email: personalData.email))
+                            Task {
+                                await createHotelAndMembership()
+                            }
                         }) {
-                            Text("Create Hotel & Account")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 50)
-                                .background(Color.blue)
-                                .cornerRadius(10)
+                            HStack {
+                                if isLoading {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .scaleEffect(0.9)
+                                }
+                                Text(isLoading ? "Creating Hotel..." : "Create Hotel")
+                                    .font(.headline)
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background((isFormValid && !isLoading) ? Color.blue : Color.gray)
+                            .cornerRadius(10)
                         }
+                        .disabled(!isFormValid || isLoading)
                         .padding(.top, 20)
                     }
                     .padding(.bottom, 40)
@@ -105,15 +108,46 @@ struct HotelInfoView: View {
             }
         }
         .navigationBarHidden(true)
+        .alert(alertTitle, isPresented: $showingAlert) {
+            Button("OK") { }
+        } message: {
+            Text(alertMessage)
+        }
+    }
+    
+    @MainActor
+    private func createHotelAndMembership() async {
+        isLoading = true
+        
+        do {
+            // Create hotel and manager membership together
+            let hotel = try await databaseService.createHotelWithManagerMembership(
+                name: hotelName.trimmingCharacters(in: .whitespaces),
+                address: address.trimmingCharacters(in: .whitespaces).isEmpty ? nil : address.trimmingCharacters(in: .whitespaces),
+                city: city.trimmingCharacters(in: .whitespaces).isEmpty ? nil : city.trimmingCharacters(in: .whitespaces),
+                state: state.trimmingCharacters(in: .whitespaces).isEmpty ? nil : state.trimmingCharacters(in: .whitespaces),
+                zipCode: zipCode.trimmingCharacters(in: .whitespaces).isEmpty ? nil : zipCode.trimmingCharacters(in: .whitespaces)
+            )
+            
+            // Success! Navigate to dashboard (placeholder for now)
+            alertTitle = "Success!"
+            alertMessage = "Hotel '\(hotel.name)' has been created successfully! You are now the manager."
+            showingAlert = true
+            
+            // TODO: Navigate to actual dashboard when ready
+            
+        } catch {
+            // Handle errors
+            alertTitle = "Hotel Creation Failed"
+            alertMessage = error.localizedDescription
+            showingAlert = true
+        }
+        
+        isLoading = false
     }
 }
 
 #Preview {
-    HotelInfoView(personalData: PersonalData(
-        firstName: "John",
-        lastName: "Doe", 
-        email: "john@example.com",
-        password: "password"
-    ))
-    .environmentObject(NavigationManager(path: .constant(NavigationPath())))
+    ManagerHotelSetupView()
+        .environmentObject(NavigationManager(path: .constant(NavigationPath())))
 }

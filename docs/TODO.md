@@ -1,81 +1,145 @@
-# Login Flow Implementation Plan
+# iOS Hotel PMS - Onboarding Flow Implementation
 
-## Overview
-Implementing a unified login screen with separate account creation paths for Managers and Employees, following CLAUDE.md principles of simple, minimal changes.
+## 🎯 Goal: Seamless signup → verification → role-based onboarding
 
-## Step-by-Step Plan
+## ✅ Completed Foundation Work
+- ✅ Project organization (Views/, Services/, Models/ folders)
+- ✅ Supabase integration (packages, SupabaseManager, AuthService, DatabaseService)
+- ✅ Basic data models (Profile.swift, Hotel.swift)
+- ✅ PersonalInfoView with validation
+- ✅ Navigation infrastructure (ContentView, NavigationManager)
 
-### Phase 1: Core Login Flow ✅ COMPLETED
-- [x] 1. **Modify LoginView.swift** 
-  - Add "Create Account" button below existing Sign In button
-  - Keep existing email/password fields and Sign In functionality
-  - Simple addition, minimal code impact
-  - **Status:** ✅ Added outlined "Create Account" button below Sign In
+## 🔄 New Improved Onboarding Flow
 
-- [x] 2. **Create AccountSelectionView.swift**
-  - New SwiftUI view with two main options:
-    - "Create Manager Account" (leads to hotel creation)
-    - "Join as Employee" (leads to hotel selection)
-  - Clean, simple UI matching existing LoginView style
-  - **Status:** ✅ Created with building/person badge icons, clean UI
+### Problem We Solved:
+- **Old flow**: Signup → immediate hotel creation → FAILED (user not verified)
+- **New flow**: Signup → email verification → login → role selection → hotel setup
 
-- [x] 3. **Stop for Verification**
-  - Review progress with user before continuing
-  - Ensure navigation and UI work as expected
-  - **Status:** ✅ Ready for user verification
+---
 
-### Phase 2: Redesigned Multi-Step Account Creation
-- [x] 4. **Create ManagerSignupView.swift** - DEPRECATED
-  - **Status:** ⚠️ Replaced with multi-step flow below
+## 📋 Current Implementation: Fix Profile Creation Issue
 
-- [x] 5. **Create PersonalInfoView.swift** 
-  - Step 1: Personal information collection
-  - Name, email, password, confirm password
-  - Clean single-purpose screen
-  - **Status:** ✅ Created clean form with side-by-side name fields
-  - **Stop for validation after completion**
+### ❌ Current Problem (RESOLVED)
+- Profile creation fails during signup due to timing/foreign key constraint issues
+- User exists in auth.users but profiles table remains empty
+- Error: "Failed to create profile, but user is created. Try logging in with email."
 
-- [x] 6. **Create HotelInfoView.swift**
-  - Step 2: Hotel business setup 
-  - Hotel name (with uniqueness validation)
-  - Location, address, contact details
-  - Professional business information
-  - **Status:** ✅ Created with Basic Info + Location sections, scrollable
-  - **Stop for validation after completion**
+### ✅ Solution: Database Trigger + Auth Metadata (Supabase Best Practice)
 
-- [x] 7. **Create AccountSuccessView.swift**
-  - Step 3: Welcome/success screen
-  - Account creation confirmation
-  - Next steps guidance
-  - **Status:** ✅ Created with email verification notice & Sign In button
+### Phase 1: Database Setup (Clean Slate) ⏳
+- [x] **Clear existing auth users and profiles data** - Fresh start
+- [ ] **Create Postgres function** for auto-profile creation
+- [ ] **Create trigger** that runs when user verifies email (email_confirmed_at is set)
+- [ ] **Function reads** firstName/lastName from auth.users.raw_user_meta_data
 
-- [x] 8. **Update Navigation Flow**
-  - Connect PersonalInfo → HotelInfo → Success
-  - Remove separate manager/employee paths
-  - Single account creation flow
-  - **Status:** ✅ Complete navigation system with data passing
+### Phase 2: iOS Code Updates 🔧
+- [ ] **Update AuthService.swift** - Add metadata parameter to signUp method
+- [ ] **Update PersonalInfoView.swift** - Pass firstName/lastName as metadata, remove manual profile creation
+- [ ] **Update DatabaseService.swift** - Remove profile creation from signup flow
 
-- [ ] 9. **Remove ManagerSignupView.swift** 
-  - Clean up deprecated single-form approach
+### Phase 3: Testing ✨
+- [ ] **Test complete flow**: Signup → Email verification → Login → Profile auto-exists
+- [ ] **Verify error is resolved** and profiles table gets populated
 
-## Key Principles (from CLAUDE.md)
-- Make every change as simple as possible
-- Each task impacts minimal code
-- Focus on simplicity over complexity
-- Get verification at checkpoints
+### Phase 4: Continue with Original Onboarding Flow 🚀
+- [ ] **EmailVerificationView** - "Check your email to verify account"
+- [ ] **Update LoginView** - check memberships after successful login
+- [ ] **AccountSelectionView** - Manager vs Employee choice (post-login only)
+- [ ] **ManagerHotelSetupView** - hotel creation for managers
+- [ ] **EmployeeJoinView** - join existing hotel by code/search
 
-## Current Status
-- ✅ Phase 1 Complete (Steps 1-3)
-- 🔄 Redesigned approach: Multi-step account creation
-- 📋 Single account type, admin manages roles later
-- 📁 Documentation now properly organized in docs/ folder
+---
 
-## Design Philosophy Change
-- ❌ Old: Predict user roles during signup
-- ✅ New: Professional business setup → role management post-signup
-- 🎯 Focus: Clean UX with proper hotel business information
+## 🏗️ New User Flow Architecture
 
-## Files Modified/Created
-- ✅ `iOS-hotelpms/LoginView.swift` - Added Create Account button
-- ✅ `iOS-hotelpms/AccountSelectionView.swift` - New selection screen
-- ✅ `docs/TODO.md` - This file (testing docs folder structure)
+### A. Signup (Anyone)
+```
+PersonalInfoView → AuthService.signUp() → EmailVerificationView
+```
+
+### B. Email Verification (Outside app)
+```
+User receives email → clicks link → email_confirmed_at set
+```
+
+### C. First Login (Critical routing)
+```
+LoginView → AuthService.signIn() → Check memberships:
+├── Has memberships → Dashboard
+└── No memberships → AccountSelectionView
+```
+
+### D. Manager Path
+```
+AccountSelectionView → ManagerHotelSetupView → Create hotel + membership → Dashboard
+```
+
+### E. Employee Path  
+```
+AccountSelectionView → EmployeeJoinView → Create join_request → PendingApprovalView
+```
+
+---
+
+## 🗄️ Updated Database Design
+
+### profiles (auto-created via trigger)
+- id (uuid, PK, FK to auth.users)
+- first_name, last_name, email, created_at
+
+### hotels  
+- id (uuid, PK)
+- name, phone, address, city, state, zip_code
+- created_by (uuid, FK to profiles.id), created_at
+
+### hotel_memberships (role management)
+- id (uuid, PK)
+- profile_id (FK), hotel_id (FK)
+- role (admin|manager|front_desk|housekeeping|maintenance)
+- status (pending|approved|rejected), created_at
+- UNIQUE(profile_id, hotel_id)
+
+### join_requests (NEW - employee requests)
+- id (uuid, PK)
+- profile_id (FK), hotel_id (FK)  
+- requested_role, status (pending|approved|rejected)
+- note, created_at
+
+---
+
+## 🎯 Benefits of New Flow
+- ✅ **No more authentication gaps** - profile always exists after signup
+- ✅ **Clear role separation** - managers create hotels, employees join them
+- ✅ **Better UX** - no confusing errors, clear next steps
+- ✅ **Scalable** - users can belong to multiple hotels
+- ✅ **Secure** - hotel creation only after verified login
+
+## 🔧 Supabase Project Details
+- Project ID: `hrlbtgpndjrnzvkaobmw`
+- URL: `https://hrlbtgpndjrnzvkaobmw.supabase.co`
+- Region: us-east-2
+
+
+
+
+## 📝 Implementation Status
+
+### ✅ Completed
+- TODO.md updated with database trigger approach
+- Database tables structure verified (all tables exist with proper foreign keys)
+
+### 🚧 In Progress  
+- Database trigger function creation
+- iOS code updates to use metadata approach
+
+### 📋 Next Steps
+1. Clear existing auth data for clean slate
+2. Create Postgres function + trigger for auto-profile creation
+3. Update iOS code to pass metadata instead of manual profile creation
+4. Test complete signup → verification → login flow
+
+### 🎯 Expected Outcome
+- No more "Failed to create profile" errors
+- Profiles automatically created when user verifies email
+- Signup data preserved in auth metadata
+- Clean, reliable onboarding flow

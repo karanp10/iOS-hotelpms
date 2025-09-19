@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct AccountSelectionView: View {
+    @EnvironmentObject var navigationManager: NavigationManager
+    
     var body: some View {
         GeometryReader { geometry in
             HStack {
@@ -21,26 +23,25 @@ struct AccountSelectionView: View {
                             .font(.largeTitle)
                             .fontWeight(.bold)
                         
-                        Text("Choose your account type")
+                        Text("How would you like to get started?")
                             .font(.title2)
                             .foregroundColor(.secondary)
                     }
                     
                     VStack(spacing: 20) {
                         Button(action: {
-                            // Manager account creation will go here
-                            print("Create Manager Account tapped")
+                            navigationManager.navigate(to: .managerHotelSetup)
                         }) {
                             VStack(spacing: 12) {
                                 Image(systemName: "building.2")
                                     .font(.system(size: 32))
                                     .foregroundColor(.blue)
                                 
-                                Text("Create Manager Account")
+                                Text("Create Hotel")
                                     .font(.headline)
                                     .foregroundColor(.primary)
                                 
-                                Text("Set up a new hotel and manage staff")
+                                Text("Set up a new hotel business and become the manager")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                     .multilineTextAlignment(.center)
@@ -57,8 +58,7 @@ struct AccountSelectionView: View {
                         }
                         
                         Button(action: {
-                            // Employee account creation will go here
-                            print("Join as Employee tapped")
+                            navigationManager.navigate(to: .employeeJoin)
                         }) {
                             VStack(spacing: 12) {
                                 Image(systemName: "person.badge.key")

@@ -10,7 +10,13 @@ import SwiftUI
 struct LoginView: View {
     @State private var email = ""
     @State private var password = ""
+    @State private var isLoading = false
+    @State private var showingAlert = false
+    @State private var alertMessage = ""
     @EnvironmentObject var navigationManager: NavigationManager
+    
+    @StateObject private var authService = AuthService()
+    @StateObject private var databaseService = DatabaseService()
     
     var body: some View {
         GeometryReader { geometry in
@@ -43,17 +49,26 @@ struct LoginView: View {
                     }
                     
                     Button(action: {
-                        // Login action will go here
-                        print("Login tapped")
+                        Task {
+                            await signInAndRoute()
+                        }
                     }) {
-                        Text("Sign In")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(Color.blue)
-                            .cornerRadius(10)
+                        HStack {
+                            if isLoading {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.9)
+                            }
+                            Text(isLoading ? "Signing In..." : "Sign In")
+                                .font(.headline)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(isLoading ? Color.gray : Color.blue)
+                        .cornerRadius(10)
                     }
+                    .disabled(isLoading)
                     
                     Button(action: {
                         navigationManager.navigate(to: .personalInfo)
@@ -79,6 +94,41 @@ struct LoginView: View {
             }
         }
         .navigationBarHidden(true)
+        .alert("Sign In Failed", isPresented: $showingAlert) {
+            Button("OK") { }
+        } message: {
+            Text(alertMessage)
+        }
+    }
+    
+    @MainActor
+    private func signInAndRoute() async {
+        isLoading = true
+        
+        do {
+            // Step 1: Sign in with Supabase Auth
+            let user = try await authService.signIn(email: email, password: password)
+            
+            // Step 2: Check user's hotel memberships
+            let membershipsCount = try await databaseService.getUserMembershipsCount()
+            
+            if membershipsCount > 0 {
+                // User has memberships - navigate to dashboard (placeholder for now)
+                alertMessage = "Welcome back! You have \(membershipsCount) hotel membership(s)."
+                showingAlert = true
+                // TODO: Navigate to actual dashboard
+            } else {
+                // New user - navigate to account selection
+                navigationManager.navigate(to: .accountSelection)
+            }
+            
+        } catch {
+            // Handle signin errors
+            alertMessage = error.localizedDescription
+            showingAlert = true
+        }
+        
+        isLoading = false
     }
 }
 

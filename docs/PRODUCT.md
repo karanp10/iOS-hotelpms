@@ -107,20 +107,39 @@ checking if reference is working correctly
 
 ## 8. Database Model (Supabase)
 
-### hotels
-- id uuid PK  
-- name text  
-- created_by uuid  
-- created_at timestamptz  
-
-### profiles
-- id uuid PK  
-- hotel_id uuid FK  
+### profiles (user identity)
+- id uuid PK (links to auth.users)
 - first_name text  
 - last_name text  
 - email text unique  
-- role text (admin, manager, front_desk, housekeeping, maintenance)  
+- created_at timestamptz
+- **Auto-created via trigger on auth.users insert**
+
+### hotels
+- id uuid PK  
+- name text  
+- phone text
+- address, city, state, zip_code text
+- created_by uuid FK (→ profiles.id)
 - created_at timestamptz  
+
+### hotel_memberships (many-to-many: users ↔ hotels)
+- id uuid PK
+- profile_id uuid FK (→ profiles.id)
+- hotel_id uuid FK (→ hotels.id)
+- role text (admin, manager, front_desk, housekeeping, maintenance)
+- status text (pending, approved, rejected)
+- created_at timestamptz
+- **UNIQUE(profile_id, hotel_id)**
+
+### join_requests (employee join workflow)
+- id uuid PK
+- profile_id uuid FK (→ profiles.id)
+- hotel_id uuid FK (→ hotels.id)
+- requested_role text
+- status text (pending, approved, rejected)
+- note text
+- created_at timestamptz
 
 ### rooms
 - id uuid PK  
@@ -154,7 +173,31 @@ checking if reference is working correctly
 
 ---
 
-## 9. Core Features
+## 9. Onboarding Flow (Critical UX)
+
+### New User Journey
+1. **Signup**: Personal info → Supabase creates auth.users + auto-creates profile
+2. **Email Verification**: User verifies email outside app
+3. **First Login**: Check hotel_memberships count:
+   - If > 0: Go to Dashboard (returning user)
+   - If = 0: Go to Account Selection (new user)
+
+### Account Selection (Post-Login)
+**Manager Path:**
+- Choose "Create Hotel" → Hotel setup form → Create hotel + membership (role='manager') → Dashboard
+
+**Employee Path:**  
+- Choose "Join Hotel" → Enter hotel code/search → Create join_request → Pending approval screen
+
+### Benefits
+- ✅ **No authentication gaps** - profile always exists after signup
+- ✅ **Role clarity** - managers create, employees join
+- ✅ **Flexible** - users can belong to multiple hotels
+- ✅ **Secure** - hotel operations only after verified login
+
+---
+
+## 10. Core Features
 - **Auth:** login/logout with Supabase.  
 - **Room Board:** occupancy + cleaning + flags per card.  
 - **Room Detail:** segmented pickers for occupancy/cleaning, chips for flags, notes, mini history.  
