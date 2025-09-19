@@ -12,8 +12,13 @@ struct ManagerHotelSetupView: View {
     @State private var alertTitle = ""
     @State private var alertMessage = ""
     @EnvironmentObject var navigationManager: NavigationManager
+    @FocusState private var focusedField: Field?
     
     @StateObject private var databaseService = DatabaseService()
+    
+    enum Field: Hashable {
+        case hotelName, phoneNumber, address, city, state, zipCode
+    }
     
     private var isFormValid: Bool {
         return !hotelName.trimmingCharacters(in: .whitespaces).isEmpty
@@ -45,11 +50,13 @@ struct ManagerHotelSetupView: View {
                             TextField("Hotel Name", text: $hotelName)
                                 .textFieldStyle(.roundedBorder)
                                 .frame(height: 44)
+                                .focused($focusedField, equals: .hotelName)
                             
                             TextField("Phone Number", text: $phoneNumber)
                                 .textFieldStyle(.roundedBorder)
-                                .keyboardType(.phonePad)
+                                .keyboardType(.numberPad)
                                 .frame(height: 44)
+                                .focused($focusedField, equals: .phoneNumber)
                         }
                         
                         // Location Information
@@ -61,20 +68,24 @@ struct ManagerHotelSetupView: View {
                             TextField("Street Address", text: $address)
                                 .textFieldStyle(.roundedBorder)
                                 .frame(height: 44)
+                                .focused($focusedField, equals: .address)
                             
                             TextField("City", text: $city)
                                 .textFieldStyle(.roundedBorder)
                                 .frame(height: 44)
+                                .focused($focusedField, equals: .city)
                             
                             HStack(spacing: 12) {
                                 TextField("State", text: $state)
                                     .textFieldStyle(.roundedBorder)
                                     .frame(height: 44)
+                                    .focused($focusedField, equals: .state)
                                 
                                 TextField("ZIP Code", text: $zipCode)
                                     .textFieldStyle(.roundedBorder)
                                     .keyboardType(.numberPad)
                                     .frame(height: 44)
+                                    .focused($focusedField, equals: .zipCode)
                             }
                         }
                         
@@ -103,11 +114,17 @@ struct ManagerHotelSetupView: View {
                     }
                     .padding(.bottom, 40)
                 }
-                .frame(width: min(400, geometry.size.width * 0.85))
+                .frame(width: min(400, max(200, geometry.size.width * 0.85)))
                 .padding(.horizontal, 30)
+            }
+            .onTapGesture {
+                focusedField = nil
             }
         }
         .navigationBarHidden(true)
+        .onTapGesture {
+            focusedField = nil
+        }
         .alert(alertTitle, isPresented: $showingAlert) {
             Button("OK") { }
         } message: {

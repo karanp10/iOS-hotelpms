@@ -246,11 +246,10 @@ class DatabaseService: ObservableObject {
         )
         
         do {
-            let _: [CreateMembershipRequest] = try await supabase
+            let _ = try await supabase
                 .from("hotel_memberships")
                 .insert(request)
                 .execute()
-                .value
         } catch {
             throw DatabaseError.networkError("Failed to create membership: \(error.localizedDescription)")
         }
@@ -263,7 +262,7 @@ class DatabaseService: ObservableObject {
         }
         
         do {
-            let response: [CreateMembershipRequest] = try await supabase
+            let response: [[String: AnyJSON]] = try await supabase
                 .from("hotel_memberships")
                 .select()
                 .eq("profile_id", value: userId)
@@ -319,11 +318,10 @@ class DatabaseService: ObservableObject {
         )
         
         do {
-            let _: [CreateJoinRequest] = try await supabase
+            let _ = try await supabase
                 .from("join_requests")
                 .insert(request)
                 .execute()
-                .value
         } catch {
             throw DatabaseError.networkError("Failed to create join request: \(error.localizedDescription)")
         }
