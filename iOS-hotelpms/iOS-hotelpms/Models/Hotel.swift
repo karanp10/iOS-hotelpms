@@ -47,3 +47,43 @@ struct Hotel: Codable, Identifiable {
         return addressComponents.joined(separator: "\n")
     }
 }
+
+struct HotelWithRoomCount {
+    let id: UUID
+    let name: String
+    let address: String?
+    let city: String?
+    let state: String?
+    let zipCode: String?
+    let createdAt: Date
+    let roomCount: Int
+    
+    var fullAddress: String {
+        var addressComponents: [String] = []
+        
+        if let address = address, !address.isEmpty {
+            addressComponents.append(address)
+        }
+        
+        var cityStateZip: [String] = []
+        if let city = city, !city.isEmpty {
+            cityStateZip.append(city)
+        }
+        if let state = state, !state.isEmpty {
+            cityStateZip.append(state)
+        }
+        if let zipCode = zipCode, !zipCode.isEmpty {
+            cityStateZip.append(zipCode)
+        }
+        
+        if !cityStateZip.isEmpty {
+            addressComponents.append(cityStateZip.joined(separator: ", "))
+        }
+        
+        return addressComponents.joined(separator: "\n")
+    }
+    
+    var needsRoomSetup: Bool {
+        return roomCount == 0
+    }
+}

@@ -64,9 +64,7 @@ checking if reference is working correctly
 - out_of_order (OOO)  
 - out_of_service (OOS)  
 - dnd  
-- lockout  
-- vip  
-- rush  
+
 
 **Guardrails:**  
 - Notes required when moving to OOO or maintenance.  
@@ -95,6 +93,7 @@ checking if reference is working correctly
 - **Realtime:** Supabase subscriptions (rooms, notes, events).  
 - **Logging:** `OSLog`.  
 - **Navigation:** `NavigationStack`.  
+- **Use:** 'Ipad'
 
 **Folder Layout**
 

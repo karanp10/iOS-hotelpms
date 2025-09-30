@@ -345,4 +345,146 @@ class DatabaseService: ObservableObject {
             throw DatabaseError.networkError("Failed to search hotels: \(error.localizedDescription)")
         }
     }
+    
+    // MARK: - Room Operations
+    
+    /// Creates rooms from user-defined ranges
+    func createRooms(hotelId: UUID, ranges: [RoomRange]) async throws {
+        guard let userId = supabase.auth.currentUser?.id else {
+            throw DatabaseError.userNotAuthenticated
+        }
+        
+        // Validate that user has access to this hotel
+        let _ = try await getHotel(id: hotelId)
+        
+        // Generate all rooms from ranges
+        var roomsToCreate: [CreateRoomRequest] = []
+        
+        for range in ranges {
+            guard range.isValid,
+                  let startRoom = Int(range.startRoom),
+                  let endRoom = Int(range.endRoom) else {
+                continue
+            }
+            
+            for roomNumber in startRoom...endRoom {
+                let floorNumber = Room.calculateFloor(from: roomNumber)
+                let room = Room(
+                    hotelId: hotelId,
+                    roomNumber: roomNumber,
+                    floorNumber: floorNumber,
+                    occupancyStatus: .vacant,
+                    cleaningStatus: .dirty,
+                    flags: []
+                )
+                roomsToCreate.append(CreateRoomRequest(room: room))
+            }
+        }
+        
+        guard !roomsToCreate.isEmpty else {
+            throw DatabaseError.networkError("No valid rooms to create")
+        }
+        
+        // Batch insert rooms
+        do {
+            let _ = try await supabase
+                .from("rooms")
+                .insert(roomsToCreate)
+                .execute()
+        } catch {
+            throw DatabaseError.networkError("Failed to create rooms: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Gets all rooms for a hotel
+    func getRooms(hotelId: UUID) async throws -> [Room] {
+        guard let userId = supabase.auth.currentUser?.id else {
+            throw DatabaseError.userNotAuthenticated
+        }
+        
+        do {
+            let response: [Room] = try await supabase
+                .from("rooms")
+                .select()
+                .eq("hotel_id", value: hotelId)
+                .order("room_number", ascending: true)
+                .execute()
+                .value
+            
+            return response
+        } catch {
+            throw DatabaseError.networkError("Failed to get rooms: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Gets all hotels for the user with their room counts
+    func getUserHotelsWithRoomCounts() async throws -> [HotelWithRoomCount] {
+        guard let userId = supabase.auth.currentUser?.id else {
+            throw DatabaseError.userNotAuthenticated
+        }
+        
+        do {
+            // First get user's hotels via membership
+            let membershipResponse: [[String: AnyJSON]] = try await supabase
+                .from("hotel_memberships")
+                .select("hotel_id")
+                .eq("profile_id", value: userId)
+                .eq("status", value: "approved")
+                .execute()
+                .value
+            
+            let hotelIds = membershipResponse.compactMap { dict -> String? in
+                dict["hotel_id"]?.stringValue
+            }
+            
+            guard !hotelIds.isEmpty else {
+                return []
+            }
+            
+            // Get hotel details
+            let hotelsResponse: [Hotel] = try await supabase
+                .from("hotels")
+                .select()
+                .in("id", values: hotelIds)
+                .execute()
+                .value
+            
+            // Get room counts for each hotel
+            var hotelsWithRoomCount: [HotelWithRoomCount] = []
+            for hotel in hotelsResponse {
+                let roomCount = try await getRoomCount(hotelId: hotel.id)
+                
+                hotelsWithRoomCount.append(HotelWithRoomCount(
+                    id: hotel.id,
+                    name: hotel.name,
+                    address: hotel.address,
+                    city: hotel.city,
+                    state: hotel.state,
+                    zipCode: hotel.zipCode,
+                    createdAt: hotel.createdAt ?? Date(),
+                    roomCount: roomCount
+                ))
+            }
+            
+            return hotelsWithRoomCount
+        } catch {
+            throw DatabaseError.networkError("Failed to get hotels with room counts: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Gets room count for a specific hotel
+    func getRoomCount(hotelId: UUID) async throws -> Int {
+        do {
+            let response: [[String: AnyJSON]] = try await supabase
+                .from("rooms")
+                .select("id")
+                .eq("hotel_id", value: hotelId)
+                .execute()
+                .value
+            
+            return response.count
+        } catch {
+            throw DatabaseError.networkError("Failed to get room count: \(error.localizedDescription)")
+        }
+    }
 }

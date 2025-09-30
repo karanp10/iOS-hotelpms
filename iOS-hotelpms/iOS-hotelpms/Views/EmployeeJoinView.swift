@@ -10,13 +10,18 @@ struct EmployeeJoinView: View {
     @State private var alertMessage = ""
     @State private var isSearching = false
     @EnvironmentObject var navigationManager: NavigationManager
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     
     @StateObject private var databaseService = DatabaseService()
     
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 32) {
+            HStack {
                 Spacer()
+                
+                VStack(spacing: AdaptiveLayout.verticalSpacing(horizontalSizeClass: horizontalSizeClass)) {
+                    Spacer()
+                        .frame(minHeight: AdaptiveLayout.topPadding(horizontalSizeClass: horizontalSizeClass))
                 
                 VStack(spacing: 16) {
                     Text("Join a Hotel")
@@ -114,11 +119,14 @@ struct EmployeeJoinView: View {
                         .padding(.top, 10)
                     }
                 }
-                .frame(width: min(400, geometry.size.width * 0.85))
-                .padding(.horizontal, 30)
+                .frame(width: AdaptiveLayout.contentWidth(geometry: geometry, horizontalSizeClass: horizontalSizeClass))
+                .padding(.horizontal, AdaptiveLayout.formPadding(horizontalSizeClass: horizontalSizeClass))
                 
                 Spacer()
             }
+            
+            Spacer()
+        }
         }
         .navigationBarHidden(true)
         .alert(alertTitle, isPresented: $showingAlert) {

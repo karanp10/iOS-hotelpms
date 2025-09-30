@@ -10,13 +10,18 @@ import SwiftUI
 struct AccountSuccessView: View {
     let userEmail: String
     @EnvironmentObject var navigationManager: NavigationManager
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     
     var body: some View {
         GeometryReader { geometry in
-            VStack {
+            HStack {
                 Spacer()
                 
-                VStack(spacing: 32) {
+                VStack(spacing: AdaptiveLayout.verticalSpacing(horizontalSizeClass: horizontalSizeClass)) {
+                    Spacer()
+                        .frame(minHeight: AdaptiveLayout.topPadding(horizontalSizeClass: horizontalSizeClass))
+                    
+                    VStack(spacing: AdaptiveLayout.verticalSpacing(horizontalSizeClass: horizontalSizeClass)) {
                     // Success Icon
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 64))
@@ -70,8 +75,10 @@ struct AccountSuccessView: View {
                     }
                     .padding(.top, 20)
                 }
-                .frame(width: min(400, geometry.size.width * 0.8))
-                .padding(40)
+                    Spacer()
+                }
+                .frame(width: AdaptiveLayout.contentWidth(geometry: geometry, horizontalSizeClass: horizontalSizeClass))
+                .padding(AdaptiveLayout.formPadding(horizontalSizeClass: horizontalSizeClass))
                 
                 Spacer()
             }

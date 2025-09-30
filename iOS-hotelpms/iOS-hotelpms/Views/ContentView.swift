@@ -10,19 +10,15 @@ import SwiftUI
 enum NavigationDestination: Hashable {
     case accountSelection
     case personalInfo
-    case hotelInfo(personalData: PersonalData)
     case accountSuccess(email: String)
     case emailVerification(email: String)
     case managerHotelSetup
     case employeeJoin
+    case hotelSelection
+    case roomSetup(hotelId: UUID)
+    case roomDashboard(hotelId: UUID)
 }
 
-struct PersonalData: Hashable {
-    let firstName: String
-    let lastName: String
-    let email: String
-    let password: String
-}
 
 struct ContentView: View {
     @State private var navigationPath = NavigationPath()
@@ -36,8 +32,6 @@ struct ContentView: View {
                         AccountSelectionView()
                     case .personalInfo:
                         PersonalInfoView()
-                    case .hotelInfo(let personalData):
-                        HotelInfoView(personalData: personalData)
                     case .accountSuccess(let email):
                         AccountSuccessView(userEmail: email)
                     case .emailVerification(let email):
@@ -46,6 +40,12 @@ struct ContentView: View {
                         ManagerHotelSetupView()
                     case .employeeJoin:
                         EmployeeJoinView()
+                    case .hotelSelection:
+                        HotelSelectionView()
+                    case .roomSetup(let hotelId):
+                        RoomSetupView(hotelId: hotelId)
+                    case .roomDashboard(let hotelId):
+                        RoomDashboardView(hotelId: hotelId)
                     }
                 }
         }

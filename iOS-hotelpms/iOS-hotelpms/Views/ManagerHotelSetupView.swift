@@ -12,6 +12,7 @@ struct ManagerHotelSetupView: View {
     @State private var alertTitle = ""
     @State private var alertMessage = ""
     @EnvironmentObject var navigationManager: NavigationManager
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @FocusState private var focusedField: Field?
     
     @StateObject private var databaseService = DatabaseService()
@@ -27,95 +28,143 @@ struct ManagerHotelSetupView: View {
     var body: some View {
         GeometryReader { geometry in
             ScrollView {
-                VStack(spacing: 32) {
-                    VStack(spacing: 16) {
-                        Text("Create Your Hotel")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                        
-                        Text("Set up your hotel business details")
-                            .font(.title2)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.top, 40)
+                HStack {
+                    Spacer()
                     
-                    VStack(spacing: 20) {
-                        // Hotel Basic Info
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Basic Information")
-                                .font(.headline)
-                                .foregroundColor(.primary)
+                    VStack(spacing: AdaptiveLayout.verticalSpacing(horizontalSizeClass: horizontalSizeClass)) {
+                        VStack(spacing: 16) {
+                            Text("Create Your Hotel")
+                                .font(.largeTitle)
+                                .fontWeight(.bold)
                             
-                            TextField("Hotel Name", text: $hotelName)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(height: 44)
-                                .focused($focusedField, equals: .hotelName)
-                            
-                            TextField("Phone Number", text: $phoneNumber)
-                                .textFieldStyle(.roundedBorder)
-                                .keyboardType(.numberPad)
-                                .frame(height: 44)
-                                .focused($focusedField, equals: .phoneNumber)
+                            Text("Set up your hotel business details")
+                                .font(.title2)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
                         }
+                        .padding(.top, AdaptiveLayout.topPadding(horizontalSizeClass: horizontalSizeClass))
                         
-                        // Location Information
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Location")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            
-                            TextField("Street Address", text: $address)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(height: 44)
-                                .focused($focusedField, equals: .address)
-                            
-                            TextField("City", text: $city)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(height: 44)
-                                .focused($focusedField, equals: .city)
-                            
-                            HStack(spacing: 12) {
-                                TextField("State", text: $state)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(height: 44)
-                                    .focused($focusedField, equals: .state)
-                                
-                                TextField("ZIP Code", text: $zipCode)
-                                    .textFieldStyle(.roundedBorder)
-                                    .keyboardType(.numberPad)
-                                    .frame(height: 44)
-                                    .focused($focusedField, equals: .zipCode)
-                            }
-                        }
-                        
-                        Button(action: {
-                            Task {
-                                await createHotelAndMembership()
-                            }
-                        }) {
-                            HStack {
-                                if isLoading {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .scaleEffect(0.9)
-                                }
-                                Text(isLoading ? "Creating Hotel..." : "Create Hotel")
+                        VStack(spacing: AdaptiveLayout.sectionSpacing(horizontalSizeClass: horizontalSizeClass)) {
+                            // Hotel Basic Info
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Basic Information")
                                     .font(.headline)
+                                    .foregroundColor(.primary)
+                                
+                                if horizontalSizeClass == .regular {
+                                    // iPad: Side-by-side layout
+                                    HStack(spacing: 12) {
+                                        TextField("Hotel Name", text: $hotelName)
+                                            .textFieldStyle(.roundedBorder)
+                                            .frame(height: 44)
+                                            .focused($focusedField, equals: .hotelName)
+                                        
+                                        TextField("Phone Number", text: $phoneNumber)
+                                            .textFieldStyle(.roundedBorder)
+                                            .keyboardType(.numberPad)
+                                            .frame(height: 44)
+                                            .focused($focusedField, equals: .phoneNumber)
+                                    }
+                                } else {
+                                    // iPhone: Stacked layout
+                                    TextField("Hotel Name", text: $hotelName)
+                                        .textFieldStyle(.roundedBorder)
+                                        .frame(height: 44)
+                                        .focused($focusedField, equals: .hotelName)
+                                    
+                                    TextField("Phone Number", text: $phoneNumber)
+                                        .textFieldStyle(.roundedBorder)
+                                        .keyboardType(.numberPad)
+                                        .frame(height: 44)
+                                        .focused($focusedField, equals: .phoneNumber)
+                                }
                             }
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background((isFormValid && !isLoading) ? Color.blue : Color.gray)
-                            .cornerRadius(10)
+                            
+                            // Location Information
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Location")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                
+                                TextField("Street Address", text: $address)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(height: 44)
+                                    .focused($focusedField, equals: .address)
+                                
+                                if horizontalSizeClass == .regular {
+                                    // iPad: Two rows with city/state/zip
+                                    HStack(spacing: 12) {
+                                        TextField("City", text: $city)
+                                            .textFieldStyle(.roundedBorder)
+                                            .frame(height: 44)
+                                            .focused($focusedField, equals: .city)
+                                        
+                                        TextField("State", text: $state)
+                                            .textFieldStyle(.roundedBorder)
+                                            .frame(height: 44)
+                                            .focused($focusedField, equals: .state)
+                                            .frame(maxWidth: 120)
+                                        
+                                        TextField("ZIP Code", text: $zipCode)
+                                            .textFieldStyle(.roundedBorder)
+                                            .keyboardType(.numberPad)
+                                            .frame(height: 44)
+                                            .focused($focusedField, equals: .zipCode)
+                                            .frame(maxWidth: 120)
+                                    }
+                                } else {
+                                    // iPhone: Stacked with city, then state/zip
+                                    TextField("City", text: $city)
+                                        .textFieldStyle(.roundedBorder)
+                                        .frame(height: 44)
+                                        .focused($focusedField, equals: .city)
+                                    
+                                    HStack(spacing: 12) {
+                                        TextField("State", text: $state)
+                                            .textFieldStyle(.roundedBorder)
+                                            .frame(height: 44)
+                                            .focused($focusedField, equals: .state)
+                                        
+                                        TextField("ZIP Code", text: $zipCode)
+                                            .textFieldStyle(.roundedBorder)
+                                            .keyboardType(.numberPad)
+                                            .frame(height: 44)
+                                            .focused($focusedField, equals: .zipCode)
+                                    }
+                                }
+                            }
+                        
+                            
+                            Button(action: {
+                                Task {
+                                    await createHotelAndMembership()
+                                }
+                            }) {
+                                HStack {
+                                    if isLoading {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                            .scaleEffect(0.9)
+                                    }
+                                    Text(isLoading ? "Creating Hotel..." : "Create Hotel")
+                                        .font(.headline)
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .background((isFormValid && !isLoading) ? Color.blue : Color.gray)
+                                .cornerRadius(10)
+                            }
+                            .disabled(!isFormValid || isLoading)
+                            .padding(.top, 20)
                         }
-                        .disabled(!isFormValid || isLoading)
-                        .padding(.top, 20)
+                        .padding(.bottom, AdaptiveLayout.formPadding(horizontalSizeClass: horizontalSizeClass))
                     }
-                    .padding(.bottom, 40)
+                    .frame(width: AdaptiveLayout.contentWidth(geometry: geometry, horizontalSizeClass: horizontalSizeClass))
+                    .padding(.horizontal, AdaptiveLayout.formPadding(horizontalSizeClass: horizontalSizeClass))
+                    
+                    Spacer()
                 }
-                .frame(width: min(400, max(200, geometry.size.width * 0.85)))
-                .padding(.horizontal, 30)
             }
             .onTapGesture {
                 focusedField = nil

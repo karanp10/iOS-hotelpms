@@ -18,13 +18,16 @@ struct LoginView: View {
     @StateObject private var authService = AuthService()
     @StateObject private var databaseService = DatabaseService()
     
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
+    
     var body: some View {
         GeometryReader { geometry in
             HStack {
                 Spacer()
                 
-                VStack(spacing: 32) {
+                VStack(spacing: AdaptiveLayout.verticalSpacing(horizontalSizeClass: horizontalSizeClass)) {
                     Spacer()
+                        .frame(minHeight: AdaptiveLayout.topPadding(horizontalSizeClass: horizontalSizeClass))
                     
                     VStack(spacing: 16) {
                         Text("Hotel PMS")
@@ -36,7 +39,7 @@ struct LoginView: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    VStack(spacing: 20) {
+                    VStack(spacing: AdaptiveLayout.sectionSpacing(horizontalSizeClass: horizontalSizeClass)) {
                         TextField("Email", text: $email)
                             .textFieldStyle(.roundedBorder)
                             .keyboardType(.emailAddress)
@@ -87,8 +90,8 @@ struct LoginView: View {
                     
                     Spacer()
                 }
-                .frame(width: min(400, geometry.size.width * 0.8))
-                .padding(40)
+                .frame(width: AdaptiveLayout.contentWidth(geometry: geometry, horizontalSizeClass: horizontalSizeClass))
+                .padding(AdaptiveLayout.formPadding(horizontalSizeClass: horizontalSizeClass))
                 
                 Spacer()
             }
@@ -109,16 +112,28 @@ struct LoginView: View {
             // Step 1: Sign in with Supabase Auth
             let user = try await authService.signIn(email: email, password: password)
             
-            // Step 2: Check user's hotel memberships
+            // Step 2: Check user's hotel memberships and room status
             let membershipsCount = try await databaseService.getUserMembershipsCount()
             
             if membershipsCount > 0 {
-                // User has memberships - navigate to dashboard (placeholder for now)
-                alertMessage = "Welcome back! You have \(membershipsCount) hotel membership(s)."
-                showingAlert = true
-                // TODO: Navigate to actual dashboard
+                // User has hotel memberships - check if any hotels need room setup
+                let hotelsWithRoomCounts = try await databaseService.getUserHotelsWithRoomCounts()
+                let hotelsNeedingRoomSetup = hotelsWithRoomCounts.filter { $0.needsRoomSetup }
+                
+                if !hotelsNeedingRoomSetup.isEmpty {
+                    // Some hotels need room setup - navigate to hotel selection
+                    navigationManager.navigate(to: .hotelSelection)
+                } else {
+                    // All hotels are configured - navigate to first hotel's dashboard
+                    if let firstHotel = hotelsWithRoomCounts.first {
+                        navigationManager.navigate(to: .roomDashboard(hotelId: firstHotel.id))
+                    } else {
+                        alertMessage = "No hotels found."
+                        showingAlert = true
+                    }
+                }
             } else {
-                // New user - navigate to account selection
+                // New user without any hotel memberships - navigate to account selection
                 navigationManager.navigate(to: .accountSelection)
             }
             

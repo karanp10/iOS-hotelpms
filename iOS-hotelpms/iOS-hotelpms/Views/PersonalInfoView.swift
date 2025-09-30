@@ -17,6 +17,7 @@ struct PersonalInfoView: View {
     @State private var alertMessage = ""
     @State private var isLoading = false
     @EnvironmentObject var navigationManager: NavigationManager
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     
     @StateObject private var authService = AuthService()
     @StateObject private var databaseService = DatabaseService()
@@ -31,10 +32,13 @@ struct PersonalInfoView: View {
     
     var body: some View {
         GeometryReader { geometry in
-            VStack {
+            HStack {
                 Spacer()
                 
-                VStack(spacing: 32) {
+                VStack(spacing: AdaptiveLayout.verticalSpacing(horizontalSizeClass: horizontalSizeClass)) {
+                    Spacer()
+                        .frame(minHeight: AdaptiveLayout.topPadding(horizontalSizeClass: horizontalSizeClass))
+                    
                     VStack(spacing: 16) {
                         Text("Personal Information")
                             .font(.largeTitle)
@@ -45,7 +49,7 @@ struct PersonalInfoView: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    VStack(spacing: 20) {
+                    VStack(spacing: AdaptiveLayout.sectionSpacing(horizontalSizeClass: horizontalSizeClass)) {
                         HStack(spacing: 12) {
                             TextField("First Name", text: $firstName)
                                 .textFieldStyle(.roundedBorder)
@@ -62,19 +66,39 @@ struct PersonalInfoView: View {
                             .autocapitalization(.none)
                             .frame(height: 44)
                         
-                        SecureField("Password", text: $password)
-                            .textFieldStyle(.roundedBorder)
-                            .textContentType(.newPassword)
-                            .frame(height: 44)
-                            .textContentType(.none)
-                            .autocorrectionDisabled()
-                        
-                        SecureField("Confirm Password", text: $confirmPassword)
-                            .textFieldStyle(.roundedBorder)
-                            .textContentType(.newPassword)
-                            .frame(height: 44)
-                            .textContentType(.none)
-                            .autocorrectionDisabled()
+                        if horizontalSizeClass == .regular {
+                            // iPad: Side-by-side password fields
+                            HStack(spacing: 12) {
+                                SecureField("Password", text: $password)
+                                    .textFieldStyle(.roundedBorder)
+                                    .textContentType(.newPassword)
+                                    .frame(height: 44)
+                                    .textContentType(.none)
+                                    .autocorrectionDisabled()
+                                
+                                SecureField("Confirm Password", text: $confirmPassword)
+                                    .textFieldStyle(.roundedBorder)
+                                    .textContentType(.newPassword)
+                                    .frame(height: 44)
+                                    .textContentType(.none)
+                                    .autocorrectionDisabled()
+                            }
+                        } else {
+                            // iPhone: Stacked password fields
+                            SecureField("Password", text: $password)
+                                .textFieldStyle(.roundedBorder)
+                                .textContentType(.newPassword)
+                                .frame(height: 44)
+                                .textContentType(.none)
+                                .autocorrectionDisabled()
+                            
+                            SecureField("Confirm Password", text: $confirmPassword)
+                                .textFieldStyle(.roundedBorder)
+                                .textContentType(.newPassword)
+                                .frame(height: 44)
+                                .textContentType(.none)
+                                .autocorrectionDisabled()
+                        }
                     }
                     
                     Button(action: {
@@ -102,9 +126,11 @@ struct PersonalInfoView: View {
                         .cornerRadius(10)
                     }
                     .disabled(!isFormValid || isLoading)
+                    
+                    Spacer()
                 }
-                .frame(width: min(400, geometry.size.width * 0.8))
-                .padding(40)
+                .frame(width: AdaptiveLayout.contentWidth(geometry: geometry, horizontalSizeClass: horizontalSizeClass))
+                .padding(AdaptiveLayout.formPadding(horizontalSizeClass: horizontalSizeClass))
                 
                 Spacer()
             }
