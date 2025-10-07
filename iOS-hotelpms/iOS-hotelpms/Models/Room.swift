@@ -100,6 +100,7 @@ struct Room: Codable, Identifiable, Hashable {
     let occupancyStatus: OccupancyStatus
     let cleaningStatus: CleaningStatus
     let flags: [RoomFlag]
+    let notes: String?
     let createdAt: Date?
     let updatedAt: Date?
     
@@ -111,6 +112,7 @@ struct Room: Codable, Identifiable, Hashable {
         case occupancyStatus = "occupancy_status"
         case cleaningStatus = "cleaning_status"
         case flags
+        case notes
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -135,6 +137,7 @@ struct Room: Codable, Identifiable, Hashable {
         let flagStrings = try container.decode([String].self, forKey: .flags)
         flags = flagStrings.compactMap { RoomFlag(rawValue: $0) }
         
+        notes = try container.decodeIfPresent(String.self, forKey: .notes)
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt)
     }
@@ -154,6 +157,7 @@ struct Room: Codable, Identifiable, Hashable {
         let flagStrings = flags.map { $0.rawValue }
         try container.encode(flagStrings, forKey: .flags)
         
+        try container.encodeIfPresent(notes, forKey: .notes)
         try container.encodeIfPresent(createdAt, forKey: .createdAt)
         try container.encodeIfPresent(updatedAt, forKey: .updatedAt)
     }
@@ -167,6 +171,7 @@ struct Room: Codable, Identifiable, Hashable {
         occupancyStatus: OccupancyStatus = .vacant,
         cleaningStatus: CleaningStatus = .dirty,
         flags: [RoomFlag] = [],
+        notes: String? = nil,
         createdAt: Date? = nil,
         updatedAt: Date? = nil
     ) {
@@ -177,6 +182,7 @@ struct Room: Codable, Identifiable, Hashable {
         self.occupancyStatus = occupancyStatus
         self.cleaningStatus = cleaningStatus
         self.flags = flags
+        self.notes = notes
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -195,6 +201,16 @@ struct Room: Codable, Identifiable, Hashable {
                flags.contains(.outOfOrder) || 
                flags.contains(.outOfService) ||
                cleaningStatus == .dirty
+    }
+    
+    var hasNotes: Bool {
+        return notes != nil && !notes!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    var notesPreview: String? {
+        guard hasNotes, let notes = notes else { return nil }
+        let trimmed = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.count > 15 ? String(trimmed.prefix(12)) + "..." : trimmed
     }
     
     // Helper to calculate floor from room number
