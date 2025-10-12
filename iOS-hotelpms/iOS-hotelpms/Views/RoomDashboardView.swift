@@ -3,7 +3,7 @@ import SwiftUI
 struct RoomDashboardView: View {
     let hotelId: UUID
     @EnvironmentObject var navigationManager: NavigationManager
-    @StateObject private var databaseService = DatabaseService()
+    @StateObject private var serviceManager = ServiceManager.shared
     
     @State private var hotel: Hotel?
     @State private var rooms: [Room] = []
@@ -16,8 +16,14 @@ struct RoomDashboardView: View {
     @State private var selectedFloorFilter: Int?
     
     // Split view state
-    @State private var selectedRoom: Room?
+    @State private var selectedRoomId: UUID?
     @State private var showingDetail = false
+    
+    // Computed property to get current room data from rooms array
+    private var selectedRoom: Room? {
+        guard let roomId = selectedRoomId else { return nil }
+        return rooms.first { $0.id == roomId }
+    }
     
     // Toast notification state
     @State private var showingToast = false
@@ -102,12 +108,30 @@ struct RoomDashboardView: View {
         )
         .navigationBarHidden(true)
         .task {
+            // TODO: Replace with proper user session management
+            // For now, set the current user ID for development/testing
+            serviceManager.setCurrentUser(UUID(uuidString: "a861e91c-2bb2-4274-945d-9a6b6bf3503d"))
             await loadData()
         }
         .alert("Error", isPresented: $showingError) {
-            Button("OK") { }
+            Button("Retry") {
+                retryLastFailedOperation()
+            }
+            Button("Cancel", role: .cancel) { }
         } message: {
             Text(errorMessage)
+        }
+        // Global service manager error handling
+        .alert("Service Error", isPresented: $serviceManager.showingError) {
+            Button("Retry") {
+                retryLastFailedOperation()
+                serviceManager.clearError()
+            }
+            Button("Cancel", role: .cancel) {
+                serviceManager.clearError()
+            }
+        } message: {
+            Text(serviceManager.lastError?.localizedDescription ?? "An unknown error occurred")
         }
     }
     
@@ -270,19 +294,21 @@ struct RoomDashboardView: View {
                                         RoomCard(
                                             room: room,
                                             onTap: {
-                                                if selectedRoom?.id == room.id {
+                                                if selectedRoomId == room.id {
                                                     // Same room tapped, close panel
                                                     withAnimation(.easeInOut(duration: 0.3)) {
-                                                        selectedRoom = nil
+                                                        selectedRoomId = nil
                                                         showingDetail = false
                                                     }
                                                 } else {
                                                     // New room selected, update content smoothly
                                                     withAnimation(.easeInOut(duration: 0.2)) {
-                                                        selectedRoom = room
+                                                        selectedRoomId = room.id
                                                         showingDetail = true
                                                         // Reset notes for new room
                                                         roomNotes = "Add notes about this room..."
+                                                        // Load existing notes for this room
+                                                        loadNotesForRoom(room)
                                                     }
                                                 }
                                             },
@@ -292,7 +318,7 @@ struct RoomDashboardView: View {
                                             onCleaningTap: { newStatus in
                                                 updateRoomCleaning(room: room, newStatus: newStatus)
                                             },
-                                            isSelected: selectedRoom?.id == room.id
+                                            isSelected: selectedRoomId == room.id
                                         )
                                     }
                                 }
@@ -327,7 +353,7 @@ struct RoomDashboardView: View {
                 
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        selectedRoom = nil
+                        selectedRoomId = nil
                         showingDetail = false
                     }
                 }) {
@@ -562,46 +588,112 @@ struct RoomDashboardView: View {
     }
     
     @State private var roomNotes: String = ""
+    @State private var existingNotes: [RoomNote] = []
     
     private func notesSection(for room: Room) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Notes")
-                .font(.headline)
-                .fontWeight(.semibold)
-            
-            TextEditor(text: $roomNotes)
-                .font(.subheadline)
-                .padding(8)
-                .background(Color(.systemBackground))
-                .cornerRadius(8)
-                .frame(minHeight: 80)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(.systemGray4), lineWidth: 1)
-                )
-                .onAppear {
-                    // Initialize with placeholder text
-                    if roomNotes.isEmpty {
-                        roomNotes = "Add notes about this room..."
-                    }
-                }
-            
-            // Save button (instant save for now)
             HStack {
+                Text("Notes")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                
                 Spacer()
                 
-                Button("Save Notes") {
-                    // TODO: Implement actual save
-                    toastMessage = "Notes saved for Room \(room.displayNumber) 📝"
-                    showToast()
+                if serviceManager.isLoadingNotes {
+                    ProgressView()
+                        .scaleEffect(0.8)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(8)
-                .font(.subheadline)
-                .fontWeight(.medium)
+            }
+            
+            // Existing notes display
+            if !existingNotes.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Previous Notes (\(existingNotes.count))")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                    
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 8) {
+                            ForEach(existingNotes) { note in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Text(note.body)
+                                            .font(.subheadline)
+                                        
+                                        Spacer()
+                                        
+                                        Text(formatDate(note.createdAt ?? Date()))
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    if note.isRecent {
+                                        HStack {
+                                            Circle()
+                                                .fill(Color.green)
+                                                .frame(width: 6, height: 6)
+                                            
+                                            Text("Recent")
+                                                .font(.caption2)
+                                                .foregroundColor(.green)
+                                        }
+                                    }
+                                }
+                                .padding(8)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(6)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 120)
+                }
+                
+                Divider()
+            }
+            
+            // New note input
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Add New Note")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+                
+                TextEditor(text: $roomNotes)
+                    .font(.subheadline)
+                    .padding(8)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(8)
+                    .frame(minHeight: 80)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color(.systemGray4), lineWidth: 1)
+                    )
+                    .onAppear {
+                        // Initialize with placeholder text
+                        if roomNotes.isEmpty {
+                            roomNotes = "Add notes about this room..."
+                        }
+                    }
+                
+                // Save button
+                HStack {
+                    Spacer()
+                    
+                    Button("Save Notes") {
+                        saveNotes(for: room)
+                    }
+                    .disabled(roomNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || 
+                             roomNotes == "Add notes about this room...")
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(roomNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || 
+                               roomNotes == "Add notes about this room..." ? Color.gray : Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                }
             }
         }
     }
@@ -686,7 +778,7 @@ struct RoomDashboardView: View {
     private func updateRoomOccupancy(room: Room, newStatus: OccupancyStatus) {
         let previousStatus = room.occupancyStatus
         
-        // Update the room in the rooms array (UI only for now)
+        // Optimistic update - update UI immediately
         if let index = rooms.firstIndex(where: { $0.id == room.id }) {
             rooms[index] = Room(
                 id: room.id,
@@ -698,13 +790,45 @@ struct RoomDashboardView: View {
                 flags: room.flags,
                 notes: room.notes,
                 createdAt: room.createdAt,
-                updatedAt: room.updatedAt
+                updatedAt: Date() // Update timestamp
             )
         }
         
         // Show toast notification
         toastMessage = "Room \(room.displayNumber) marked as \(newStatus.displayName) ✅"
         showToast()
+        
+        // Persist to database asynchronously
+        Task {
+            let success = await serviceManager.updateRoomOccupancy(
+                roomId: room.id,
+                newStatus: newStatus,
+                previousStatus: previousStatus
+            )
+            
+            if !success {
+                // Revert optimistic update on error
+                await MainActor.run {
+                    if let index = rooms.firstIndex(where: { $0.id == room.id }) {
+                        rooms[index] = Room(
+                            id: room.id,
+                            hotelId: room.hotelId,
+                            roomNumber: room.roomNumber,
+                            floorNumber: room.floorNumber,
+                            occupancyStatus: previousStatus,
+                            cleaningStatus: room.cleaningStatus,
+                            flags: room.flags,
+                            notes: room.notes,
+                            createdAt: room.createdAt,
+                            updatedAt: room.updatedAt
+                        )
+                    }
+                    
+                    errorMessage = "Failed to update room: \(serviceManager.lastError?.localizedDescription ?? "Unknown error")"
+                    showingError = true
+                }
+            }
+        }
         
         // Setup undo functionality (only if not already undoing)
         if previousStatus != newStatus {
@@ -719,7 +843,7 @@ struct RoomDashboardView: View {
     private func updateRoomCleaning(room: Room, newStatus: CleaningStatus) {
         let previousStatus = room.cleaningStatus
         
-        // Update the room in the rooms array (UI only for now)
+        // Optimistic update - update UI immediately
         if let index = rooms.firstIndex(where: { $0.id == room.id }) {
             rooms[index] = Room(
                 id: room.id,
@@ -729,8 +853,9 @@ struct RoomDashboardView: View {
                 occupancyStatus: room.occupancyStatus,
                 cleaningStatus: newStatus,
                 flags: room.flags,
+                notes: room.notes,
                 createdAt: room.createdAt,
-                updatedAt: room.updatedAt
+                updatedAt: Date() // Update timestamp
             )
         }
         
@@ -738,6 +863,38 @@ struct RoomDashboardView: View {
         let emoji = newStatus == .cleaningInProgress ? "🧹" : (newStatus == .inspected ? "✨" : "🧽")
         toastMessage = "Room \(room.displayNumber) set to \(newStatus.displayName) \(emoji)"
         showToast()
+        
+        // Persist to database asynchronously
+        Task {
+            let success = await serviceManager.updateRoomCleaning(
+                roomId: room.id,
+                newStatus: newStatus,
+                previousStatus: previousStatus
+            )
+            
+            if !success {
+                // Revert optimistic update on error
+                await MainActor.run {
+                    if let index = rooms.firstIndex(where: { $0.id == room.id }) {
+                        rooms[index] = Room(
+                            id: room.id,
+                            hotelId: room.hotelId,
+                            roomNumber: room.roomNumber,
+                            floorNumber: room.floorNumber,
+                            occupancyStatus: room.occupancyStatus,
+                            cleaningStatus: previousStatus,
+                            flags: room.flags,
+                            notes: room.notes,
+                            createdAt: room.createdAt,
+                            updatedAt: room.updatedAt
+                        )
+                    }
+                    
+                    errorMessage = "Failed to update cleaning status: \(serviceManager.lastError?.localizedDescription ?? "Unknown error")"
+                    showingError = true
+                }
+            }
+        }
         
         // Setup undo functionality (only if not already undoing)
         if previousStatus != newStatus {
@@ -840,16 +997,22 @@ struct RoomDashboardView: View {
     
     // MARK: - Flag Toggle Functions
     private func toggleFlag(_ flag: RoomFlag, for room: Room) {
+        let previousFlags = room.flags
+        
+        // Calculate new flags
+        var newFlags = room.flags
+        let isRemoving = newFlags.contains(flag)
+        
+        if isRemoving {
+            newFlags.removeAll { $0 == flag }
+            toastMessage = "Removed \(flag.displayName) flag from Room \(room.displayNumber)"
+        } else {
+            newFlags.append(flag)
+            toastMessage = "Added \(flag.displayName) flag to Room \(room.displayNumber)"
+        }
+        
+        // Optimistic update - update UI immediately
         if let index = rooms.firstIndex(where: { $0.id == room.id }) {
-            var newFlags = room.flags
-            if newFlags.contains(flag) {
-                newFlags.removeAll { $0 == flag }
-                toastMessage = "Removed \(flag.displayName) flag from Room \(room.displayNumber)"
-            } else {
-                newFlags.append(flag)
-                toastMessage = "Added \(flag.displayName) flag to Room \(room.displayNumber)"
-            }
-            
             rooms[index] = Room(
                 id: room.id,
                 hotelId: room.hotelId,
@@ -860,10 +1023,97 @@ struct RoomDashboardView: View {
                 flags: newFlags,
                 notes: room.notes,
                 createdAt: room.createdAt,
-                updatedAt: room.updatedAt
+                updatedAt: Date() // Update timestamp
+            )
+        }
+        
+        showToast()
+        
+        // Persist to database asynchronously
+        Task {
+            let success = await serviceManager.toggleRoomFlag(
+                roomId: room.id,
+                flag: flag,
+                isRemoving: isRemoving
             )
             
-            showToast()
+            if !success {
+                // Revert optimistic update on error
+                await MainActor.run {
+                    if let index = rooms.firstIndex(where: { $0.id == room.id }) {
+                        rooms[index] = Room(
+                            id: room.id,
+                            hotelId: room.hotelId,
+                            roomNumber: room.roomNumber,
+                            floorNumber: room.floorNumber,
+                            occupancyStatus: room.occupancyStatus,
+                            cleaningStatus: room.cleaningStatus,
+                            flags: previousFlags,
+                            notes: room.notes,
+                            createdAt: room.createdAt,
+                            updatedAt: room.updatedAt
+                        )
+                    }
+                    
+                    errorMessage = "Failed to toggle flag: \(serviceManager.lastError?.localizedDescription ?? "Unknown error")"
+                    showingError = true
+                }
+            }
+        }
+    }
+    
+    // MARK: - Notes Functions
+    private func loadNotesForRoom(_ room: Room) {
+        Task {
+            let notes = await serviceManager.loadNotes(for: room.id)
+            
+            await MainActor.run {
+                existingNotes = notes
+            }
+        }
+    }
+    
+    private func saveNotes(for room: Room) {
+        let noteText = roomNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Validate note content
+        guard !noteText.isEmpty && noteText != "Add notes about this room..." else {
+            return
+        }
+        
+        Task {
+            let success = await serviceManager.saveNote(roomId: room.id, body: noteText)
+            
+            await MainActor.run {
+                if success {
+                    toastMessage = "Notes saved for Room \(room.displayNumber) 📝"
+                    showToast()
+                    // Clear the text area after successful save
+                    roomNotes = "Add notes about this room..."
+                    // Reload notes to show the new one
+                    loadNotesForRoom(room)
+                } else {
+                    errorMessage = "Failed to save notes: \(serviceManager.lastError?.localizedDescription ?? "Unknown error")"
+                    showingError = true
+                }
+            }
+        }
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        let calendar = Calendar.current
+        
+        if calendar.isDate(date, inSameDayAs: Date()) {
+            formatter.dateFormat = "h:mm a"
+            return "Today \(formatter.string(from: date))"
+        } else if let yesterday = calendar.date(byAdding: .day, value: -1, to: Date()),
+                  calendar.isDate(date, inSameDayAs: yesterday) {
+            formatter.dateFormat = "h:mm a"
+            return "Yesterday \(formatter.string(from: date))"
+        } else {
+            formatter.dateFormat = "MMM d, h:mm a"
+            return formatter.string(from: date)
         }
     }
     
@@ -915,17 +1165,26 @@ struct RoomDashboardView: View {
         
         do {
             // Load hotel info and rooms in parallel
-            async let hotelTask = databaseService.getHotel(id: hotelId)
-            async let roomsTask = databaseService.getRooms(hotelId: hotelId)
+            async let hotelTask = serviceManager.databaseService.getHotel(id: hotelId)
+            async let roomsTask = serviceManager.loadRooms(for: hotelId)
             
             hotel = try await hotelTask
-            rooms = try await roomsTask
+            rooms = await roomsTask
         } catch {
             errorMessage = "Failed to load dashboard: \(error.localizedDescription)"
             showingError = true
         }
         
         isLoading = false
+    }
+    
+    // MARK: - Retry Logic
+    private func retryLastFailedOperation() {
+        Task {
+            // For now, retry loading data as the most common operation
+            // In a more sophisticated implementation, we could track the last failed operation
+            await loadData()
+        }
     }
 }
 
