@@ -1,81 +1,28 @@
-  ⎿  RoomDashboard ↔ Database Integration Plan
+TODO LIST
 
-     Goal: Connect RoomDashboardView to live database with proper audit trail
 
-     Phase 1: Replace Local State with Database Services
+1. Simplify The Border System (3 Systems Only)
+- default border state (greyed border normal setting) -> for all variants of cleaning and occupancy status whatever
+ - remove all other border combos lets greatly simplify it
+- if room is occcupied (greyed in like it currently is)
+- if room is vacant (not greyed in)
+ 
+ Basically remove all borders go to default border and then have a state for the occupeid where it is shadowede in card like it currently is and then no shadow if not occupied
+ 
+ 2. Status Taxonomy
+ - use supabase mcp and change enum for cleaning status from (dirty, cleaning, inspected) to (dirty, cleaning, ready)
+ - also change value after chanign tbale value using supabase mcp
+ - change all references of inspected ot ready everywher eon the room dashboard
+ 
 
-     1.1 Service Integration
+3. Note Icon
+- Add anode badge on the card above the updateed part whne notes exist(past 48 hours)
+- Just shows note is present quickly
 
-     - Replace @StateObject DatabaseService() with RoomService + NotesService
-     - Remove rooms: [Room] = [] array, use service-based state
-     - Inject services properly for dependency management
+4. Updated At
+- Create service that shows latest time that the room has been updated inside respective service folder
+- Change the updated hardcoded from 12m ago to actually whatever time it has been recently updated (ex: 5 min ago)
+- Optimize it make sure its not constatnly pulling yk find th ebest way to achieve this\
 
-     1.2 Replace Local Room Updates
 
-     - updateRoomOccupancy() → RoomService.updateOccupancyStatus()
-     - updateRoomCleaning() → RoomService.updateCleaningStatus()  
-     - toggleFlag() → RoomService.toggleFlag()
-     - Keep optimistic UI updates but add database persistence
 
-     1.3 Implement Notes Integration
-
-     - Replace "TODO: Implement actual save" with NotesService.createNote()
-     - Load existing notes for selected room
-     - Add notes display in room detail panel
-
-     Phase 2: Add Audit Trail Support
-
-     2.1 Create AuditService Integration
-
-     - Every room change should create room_history entry
-     - Track what changed (occupancy_status, cleaning_status, flags)
-     - Include before/after values for audit trail
-
-     2.2 Get Current User Context
-
-     - Pass current user ID for updated_by field
-     - Ensure all changes are attributed to logged-in user
-
-     Phase 3: State Management Strategy
-
-     3.1 Centralized State Pattern
-
-     - Use @StateObject for services (single instances)
-     - Implement proper error boundaries
-     - Add loading states for all database operations
-
-     3.2 Optimistic Updates with Rollback
-
-     - Update UI immediately for responsiveness
-     - Persist to database asynchronously  
-     - Revert UI changes if database operation fails
-     - Show proper error messages with retry options
-
-     Phase 4: Real-time Sync (Future)
-
-     - Add Supabase realtime subscriptions
-     - Update UI when other users make changes
-     - Handle conflicts gracefully
-
-     Benefits
-
-     - Immediate functionality: App actually works with live data
-     - Proper audit trail: All changes tracked in database
-     - Clean architecture: Business logic stays in services
-     - Better UX: Optimistic updates with proper error handling
-     - Scalable: Ready for multi-user scenarios
-
-     Files to Modify
-
-     - RoomDashboardView.swift - service integration & database calls
-     - AuditService.swift - room history tracking (may need enhancement)
-     - Minimal changes to existing services (they're already ready)
-
-     This gets the core functionality working immediately while maintaining clean architecture.
-     
-     
-     POST FIX STUFF -> Things that have been noted down that need to be fixed next
-     - notes tab page is too small should it be scrollable? Multiple notes should be configured
-        - also should notes automatically delete after a week? Notes should also have a delete button enxt to it or some other type of mechanism don't want to make it too clunky
-     -  user authetnication?
-     - have to clean up all the animations inside th epage the state looks messy the ipad scren keps popping in and out that ahs to be fixed properly. 

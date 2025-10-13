@@ -6,6 +6,8 @@ struct RoomCard: View {
     let onOccupancyTap: ((OccupancyStatus) -> Void)?
     let onCleaningTap: ((CleaningStatus) -> Void)?
     let isSelected: Bool
+    let isCompressed: Bool
+    let recentNotes: [RoomNote]
     
     @State private var occupancyScale: CGFloat = 1.0
     @State private var cleaningScale: CGFloat = 1.0
@@ -15,13 +17,17 @@ struct RoomCard: View {
         onTap: @escaping () -> Void,
         onOccupancyTap: ((OccupancyStatus) -> Void)? = nil,
         onCleaningTap: ((CleaningStatus) -> Void)? = nil,
-        isSelected: Bool = false
+        isSelected: Bool = false,
+        isCompressed: Bool = false,
+        recentNotes: [RoomNote] = []
     ) {
         self.room = room
         self.onTap = onTap
         self.onOccupancyTap = onOccupancyTap
         self.onCleaningTap = onCleaningTap
         self.isSelected = isSelected
+        self.isCompressed = isCompressed
+        self.recentNotes = recentNotes
     }
     
     var body: some View {
@@ -71,6 +77,13 @@ struct RoomCard: View {
                             .foregroundColor(.secondary)
                         
                         Spacer()
+                        
+                        // Note icon badge for recent notes
+                        if hasRecentNotes {
+                            Image(systemName: "note.text")
+                                .font(.system(size: 10))
+                                .foregroundColor(.blue)
+                        }
                     }
                     
                     // Notes Preview below timestamp
@@ -83,17 +96,12 @@ struct RoomCard: View {
                 }
             }
             .padding(12)
-            .frame(height: 140)
+            .frame(height: 165)
             .background(backgroundForRoom)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(borderColor, lineWidth: room.needsAttention ? 2 : 1)
-            )
-            .overlay(
-                // Colored left border for flagged rooms
-                leftBorderOverlay,
-                alignment: .leading
+                    .stroke(borderColor, lineWidth: 1)
             )
             .shadow(
                 color: isSelected ? .blue.opacity(0.3) : .black.opacity(0.06), 
@@ -103,6 +111,11 @@ struct RoomCard: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+    }
+    
+    // MARK: - Computed Properties
+    private var hasRecentNotes: Bool {
+        return recentNotes.contains { $0.roomId == room.id && $0.isRecent }
     }
     
     // MARK: - Status Icon
@@ -117,8 +130,8 @@ struct RoomCard: View {
                     .foregroundColor(.blue)
                     .font(.caption)
             } else {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
+                Image(systemName: "info.circle")
+                    .foregroundColor(.secondary)
                     .font(.caption)
             }
         }
@@ -148,16 +161,18 @@ struct RoomCard: View {
                     .fill(colorForOccupancy(room.occupancyStatus))
                     .frame(width: 8, height: 8)
                 
-                Text(room.occupancyStatus.displayName)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .truncationMode(.tail)
+                if !isCompressed {
+                    Text(room.occupancyStatus.displayName)
+                        .font(.footnote)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .truncationMode(.tail)
+                }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
             .background(colorForOccupancy(room.occupancyStatus).opacity(0.15))
             .cornerRadius(12)
             .overlay(
@@ -193,15 +208,17 @@ struct RoomCard: View {
                     .font(.system(size: 10))
                     .foregroundColor(colorForCleaning(room.cleaningStatus))
                 
-                Text(room.cleaningStatus.displayName)
-                    .font(.caption)
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .truncationMode(.tail)
+                if !isCompressed {
+                    Text(room.cleaningStatus.displayName)
+                        .font(.footnote)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .truncationMode(.tail)
+                }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
             .background(colorForCleaning(room.cleaningStatus).opacity(0.15))
             .cornerRadius(12)
             .overlay(
@@ -217,9 +234,7 @@ struct RoomCard: View {
     
     // MARK: - Background for Room
     private var backgroundForRoom: Color {
-        if room.needsAttention {
-            return Color(.systemBackground).opacity(0.95)
-        } else if room.occupancyStatus == .occupied || room.hasFlags {
+        if room.occupancyStatus == .occupied {
             return Color(.secondarySystemBackground)
         } else {
             return Color(.systemBackground)
@@ -227,70 +242,9 @@ struct RoomCard: View {
     }
     
     private var borderColor: Color {
-        if room.needsAttention {
-            return .orange
-        } else {
-            return Color(.systemGray4)
-        }
+        return Color(.systemGray4)
     }
     
-    // MARK: - Left Border for Room Status
-    private var leftBorderOverlay: some View {
-        Group {
-            if shouldShowStatusBorder {
-                Rectangle()
-                    .fill(statusBorderColor)
-                    .frame(width: 4)
-            } else {
-                EmptyView()
-            }
-        }
-    }
-    
-    private var shouldShowStatusBorder: Bool {
-        // Show border for: all cleaning statuses, occupied rooms, or flagged rooms
-        return room.cleaningStatus == .dirty ||
-               room.cleaningStatus == .cleaningInProgress ||
-               room.cleaningStatus == .inspected ||
-               room.occupancyStatus == .occupied ||
-               room.hasFlags
-    }
-    
-    private var statusBorderColor: Color {
-        // Priority order: Cleaning status > Occupancy status > Flags
-        
-        // 1. Cleaning status takes highest priority
-        switch room.cleaningStatus {
-        case .dirty:
-            return .orange
-        case .cleaningInProgress:
-            return .yellow
-        case .inspected:
-            return .purple
-        }
-        
-        // 2. Occupancy status (only occupied gets border)
-        if room.occupancyStatus == .occupied {
-            return .blue
-        }
-        
-        // 3. Flags (lowest priority)
-        if room.flags.contains(.maintenanceRequired) {
-            return .orange
-        } else if room.flags.contains(.outOfOrder) || room.flags.contains(.outOfService) {
-            return .red
-        } else if room.flags.contains(.dnd) {
-            return .purple
-        }
-        
-        // Default (should not reach here if shouldShowStatusBorder logic is correct)
-        return .blue
-    }
-    
-    private var flagBorderColor: Color {
-        // For backward compatibility - now delegates to statusBorderColor
-        return statusBorderColor
-    }
     
     // MARK: - Status Cycling Logic
     private func nextOccupancyStatus(from current: OccupancyStatus) -> OccupancyStatus {
@@ -306,8 +260,8 @@ struct RoomCard: View {
     private func nextCleaningStatus(from current: CleaningStatus) -> CleaningStatus {
         switch current {
         case .dirty: return .cleaningInProgress
-        case .cleaningInProgress: return .inspected
-        case .inspected: return .dirty
+        case .cleaningInProgress: return .ready
+        case .ready: return .dirty
         }
     }
     
@@ -326,7 +280,7 @@ struct RoomCard: View {
         switch status {
         case .dirty: return .red
         case .cleaningInProgress: return .yellow
-        case .inspected: return .purple
+        case .ready: return .green
         }
     }
     
@@ -361,7 +315,7 @@ struct RoomCard: View {
                 roomNumber: 205,
                 floorNumber: 2,
                 occupancyStatus: .occupied,
-                cleaningStatus: .inspected,
+                cleaningStatus: .ready,
                 flags: [],
                 notes: "Guest requested extra towels and late checkout"
             ),
@@ -395,6 +349,37 @@ struct RoomCard: View {
             ),
             onTap: {},
             isSelected: false
+        )
+        
+        // Test card with long status text to verify no truncation
+        RoomCard(
+            room: Room(
+                hotelId: UUID(),
+                roomNumber: 250,
+                floorNumber: 2,
+                occupancyStatus: .stayover,
+                cleaningStatus: .cleaningInProgress,
+                flags: [.maintenanceRequired],
+                notes: "Long notes text to test preview"
+            ),
+            onTap: {},
+            isSelected: false
+        )
+        
+        // Test card in compressed mode (icons only)
+        RoomCard(
+            room: Room(
+                hotelId: UUID(),
+                roomNumber: 301,
+                floorNumber: 3,
+                occupancyStatus: .occupied,
+                cleaningStatus: .dirty,
+                flags: [.dnd],
+                notes: "Compressed mode test"
+            ),
+            onTap: {},
+            isSelected: false,
+            isCompressed: true
         )
     }
     .padding()

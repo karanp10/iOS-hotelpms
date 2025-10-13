@@ -31,13 +31,13 @@ enum OccupancyStatus: String, CaseIterable, Codable {
 enum CleaningStatus: String, CaseIterable, Codable {
     case dirty = "dirty"
     case cleaningInProgress = "cleaning_in_progress"
-    case inspected = "inspected"
+    case ready = "ready"
     
     var displayName: String {
         switch self {
         case .dirty: return "Dirty"
         case .cleaningInProgress: return "Cleaning"
-        case .inspected: return "Inspected"
+        case .ready: return "Ready"
         }
     }
     
@@ -45,7 +45,7 @@ enum CleaningStatus: String, CaseIterable, Codable {
         switch self {
         case .dirty: return "red"
         case .cleaningInProgress: return "yellow"
-        case .inspected: return "green"
+        case .ready: return "green"
         }
     }
     
@@ -53,7 +53,7 @@ enum CleaningStatus: String, CaseIterable, Codable {
         switch self {
         case .dirty: return "exclamationmark.triangle.fill"
         case .cleaningInProgress: return "clock.fill"
-        case .inspected: return "checkmark.circle.fill"
+        case .ready: return "checkmark.circle.fill"
         }
     }
 }

@@ -7,6 +7,7 @@ struct RoomDashboardView: View {
     
     @State private var hotel: Hotel?
     @State private var rooms: [Room] = []
+    @State private var recentNotes: [RoomNote] = []
     @State private var isLoading = false
     @State private var showingError = false
     @State private var errorMessage = ""
@@ -29,9 +30,6 @@ struct RoomDashboardView: View {
     @State private var showingToast = false
     @State private var toastMessage = ""
     
-    // Success animation state
-    @State private var showingSuccessCheck = false
-    @State private var successCheckPosition: CGPoint = .zero
     
     // Undo functionality state
     @State private var showingUndo = false
@@ -39,7 +37,6 @@ struct RoomDashboardView: View {
     @State private var undoMessage = ""
     
     private let columns = [
-        GridItem(.flexible()),
         GridItem(.flexible()),
         GridItem(.flexible()),
         GridItem(.flexible())
@@ -97,10 +94,6 @@ struct RoomDashboardView: View {
         .overlay(
             // Toast notification
             toastView
-        )
-        .overlay(
-            // Success animation overlay
-            successAnimationView
         )
         .overlay(
             // Undo overlay
@@ -318,7 +311,9 @@ struct RoomDashboardView: View {
                                             onCleaningTap: { newStatus in
                                                 updateRoomCleaning(room: room, newStatus: newStatus)
                                             },
-                                            isSelected: selectedRoomId == room.id
+                                            isSelected: selectedRoomId == room.id,
+                                            isCompressed: selectedRoom != nil,
+                                            recentNotes: recentNotes
                                         )
                                     }
                                 }
@@ -444,14 +439,14 @@ struct RoomDashboardView: View {
                 }
             }
             
-            // Flags if any
-            if room.hasFlags {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Flags")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+            // Flags section (always present to avoid layout jumps)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Flags")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                if room.hasFlags {
+                    HStack(alignment: .top, spacing: 6) {
                         ForEach(room.flags, id: \.self) { flag in
                             HStack(spacing: 4) {
                                 Image(systemName: flag.systemImage)
@@ -466,7 +461,13 @@ struct RoomDashboardView: View {
                             .background(colorForFlag(flag))
                             .cornerRadius(6)
                         }
+                        Spacer()
                     }
+                } else {
+                    Text("No flags set")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 4)
                 }
             }
         }
@@ -483,7 +484,6 @@ struct RoomDashboardView: View {
                 ForEach(OccupancyStatus.allCases, id: \.self) { status in
                     Button(action: {
                         updateRoomOccupancy(room: room, newStatus: status)
-                        showSuccessAnimation()
                     }) {
                         HStack {
                             Circle()
@@ -497,9 +497,9 @@ struct RoomDashboardView: View {
                             Spacer()
                             
                             if room.occupancyStatus == status {
-                                Image(systemName: "checkmark")
-                                    .font(.subheadline)
-                                    .foregroundColor(.blue)
+                                Circle()
+                                    .fill(Color.blue)
+                                    .frame(width: 8, height: 8)
                             }
                         }
                         .padding(.horizontal, 12)
@@ -523,7 +523,6 @@ struct RoomDashboardView: View {
                 ForEach(CleaningStatus.allCases, id: \.self) { status in
                     Button(action: {
                         updateRoomCleaning(room: room, newStatus: status)
-                        showSuccessAnimation()
                     }) {
                         HStack {
                             Image(systemName: status.systemImage)
@@ -537,9 +536,9 @@ struct RoomDashboardView: View {
                             Spacer()
                             
                             if room.cleaningStatus == status {
-                                Image(systemName: "checkmark")
-                                    .font(.subheadline)
-                                    .foregroundColor(.blue)
+                                Circle()
+                                    .fill(Color.blue)
+                                    .frame(width: 8, height: 8)
                             }
                         }
                         .padding(.horizontal, 12)
@@ -702,6 +701,8 @@ struct RoomDashboardView: View {
     // MARK: - Toast View
     private var toastView: some View {
         VStack {
+            Spacer()
+            
             if showingToast {
                 HStack {
                     Text(toastMessage)
@@ -713,33 +714,14 @@ struct RoomDashboardView: View {
                 .background(Color.black.opacity(0.8))
                 .cornerRadius(8)
                 .transition(.asymmetric(
-                    insertion: .move(edge: .top).combined(with: .opacity),
+                    insertion: .move(edge: .bottom).combined(with: .opacity),
                     removal: .opacity
                 ))
                 .animation(.easeInOut(duration: 0.3), value: showingToast)
-            }
-            
-            Spacer()
-        }
-        .padding(.top, 50)
-    }
-    
-    // MARK: - Success Animation View
-    private var successAnimationView: some View {
-        ZStack {
-            if showingSuccessCheck {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.green)
-                    .background(Color.white)
-                    .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.2), radius: 8)
-                    .scaleEffect(showingSuccessCheck ? 1.0 : 0.3)
-                    .opacity(showingSuccessCheck ? 1.0 : 0.0)
-                    .position(successCheckPosition)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.6), value: showingSuccessCheck)
+                .padding(.horizontal, 20)
             }
         }
+        .padding(.bottom, showingUndo ? 120 : 70)
     }
     
     // MARK: - Undo View
@@ -860,7 +842,7 @@ struct RoomDashboardView: View {
         }
         
         // Show toast notification
-        let emoji = newStatus == .cleaningInProgress ? "🧹" : (newStatus == .inspected ? "✨" : "🧽")
+        let emoji = newStatus == .cleaningInProgress ? "🧹" : (newStatus == .ready ? "✨" : "🧽")
         toastMessage = "Room \(room.displayNumber) set to \(newStatus.displayName) \(emoji)"
         showToast()
         
@@ -963,21 +945,6 @@ struct RoomDashboardView: View {
         showToast()
     }
     
-    private func showSuccessAnimation() {
-        // Position the success check in the center of the right panel
-        successCheckPosition = CGPoint(x: UIScreen.main.bounds.width * 0.8, y: UIScreen.main.bounds.height * 0.5)
-        
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
-            showingSuccessCheck = true
-        }
-        
-        // Auto-hide after 1 second
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showingSuccessCheck = false
-            }
-        }
-    }
     
     private func showUndo() {
         // Hide any existing undo first
@@ -1097,6 +1064,9 @@ struct RoomDashboardView: View {
                     showingError = true
                 }
             }
+            
+            // Reload recent notes to update badge visibility
+            await reloadRecentNotes()
         }
     }
     
@@ -1132,7 +1102,7 @@ struct RoomDashboardView: View {
         switch status {
         case .dirty: return .red
         case .cleaningInProgress: return .yellow
-        case .inspected: return .purple
+        case .ready: return .purple
         }
     }
     
@@ -1164,18 +1134,30 @@ struct RoomDashboardView: View {
         isLoading = true
         
         do {
-            // Load hotel info and rooms in parallel
+            // Load hotel info, rooms, and recent notes in parallel
             async let hotelTask = serviceManager.databaseService.getHotel(id: hotelId)
             async let roomsTask = serviceManager.loadRooms(for: hotelId)
+            async let notesTask = serviceManager.notesService.getRecentNotesForHotel(hotelId: hotelId)
             
             hotel = try await hotelTask
             rooms = await roomsTask
+            recentNotes = try await notesTask
         } catch {
             errorMessage = "Failed to load dashboard: \(error.localizedDescription)"
             showingError = true
         }
         
         isLoading = false
+    }
+    
+    @MainActor
+    private func reloadRecentNotes() async {
+        do {
+            recentNotes = try await serviceManager.notesService.getRecentNotesForHotel(hotelId: hotelId)
+        } catch {
+            // Silently fail for notes reload - don't show error to user
+            print("Failed to reload recent notes: \(error.localizedDescription)")
+        }
     }
     
     // MARK: - Retry Logic
