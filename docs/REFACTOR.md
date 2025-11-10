@@ -15,25 +15,35 @@ This document captures the current problem areas in the codebase and the concret
 
 ## High-Priority View Refactors
 
-### `Views/RoomDashboardView.swift` (≈1,287 LOC)
+### ✅ COMPLETED - `Views/RoomDashboardView.swift` (1,287 LOC → 179 LOC)
 **Issues**
-- UI layout, filtering, Supabase calls, undo/toast orchestration, and mutation logic all live in one file.
-- Hard to unit test because data loads and side-effects happen in the view body.
+- ✅ RESOLVED: UI layout, filtering, Supabase calls, undo/toast orchestration, and mutation logic all live in one file.
+- ✅ RESOLVED: Hard to unit test because data loads and side-effects happen in the view body.
 
-**Actions**
-1. Create `RoomDashboardViewModel` that loads rooms/hotel info, tracks filters, performs mutations, and exposes derived collections (filtered rooms, roomsByFloor, availableFloors).
-2. Move mutation helpers (`updateRoomOccupancy`, `updateRoomCleaning`, flag toggles, notes CRUD) into the view model; have the view call async methods via `@StateObject`.
-3. Split UI into subviews (e.g., `RoomStatsHeader`, `RoomFiltersView`, `RoomGridView`, `RoomDetailPanel`, `NotesPanel`, `ToastStack`, `UndoBanner`) and place them under `Views/Components/Dashboard/`.
-4. Extract the toast/undo logic into reusable components so other screens can leverage the same interactions.
+**Completed Actions**
+1. ✅ Created `ViewModels/RoomDashboardViewModel.swift` that loads rooms/hotel info, tracks filters, performs mutations, and exposes derived collections (filtered rooms, roomsByFloor, availableFloors).
+2. ✅ Moved all mutation helpers (`updateRoomOccupancy`, `updateRoomCleaning`, flag toggles, notes CRUD) into the view model; view now calls async methods via `@StateObject`.
+3. ✅ Split UI into subviews and placed them under `Views/Components/Dashboard/`:
+   - `RoomStatsHeader.swift` - Hotel name and quick stats display
+   - `RoomFiltersView.swift` - Search and filter controls 
+   - `RoomGridView.swift` - Room grid layout by floor
+   - `RoomDetailPanel.swift` - Room detail sidebar with status controls
+   - `NotesPanel.swift` - Notes input and display
+   - `ToastStack.swift` - Toast notification overlay
+   - `UndoBanner.swift` - Undo action banner
+4. ✅ Extracted toast/undo logic into reusable components that other screens can leverage.
 
-### `Views/Components/RoomCard.swift` (≈386 LOC)
+### ✅ COMPLETED - `Views/Components/RoomCard.swift` (386 LOC → 263 LOC)
 **Issues**
-- Single component handles layout, animation state, badge logic, and business transitions for occupancy/cleaning.
+- ✅ RESOLVED: Single component handled layout, animation state, badge logic, and business transitions for occupancy/cleaning.
 
-**Actions**
-1. Separate presentation vs. behavior: keep `RoomCardView` lightweight, and move “next status” calculations and Supabase triggers into the dashboard view model.
-2. Create dedicated chip subviews (`OccupancyChipView`, `CleaningChipView`, `FlagBadgeRow`) with shared color/icon helpers so styles can be reused elsewhere.
-3. Relocate animation state into the chip subviews (or remove if not essential) to simplify the parent card.
+**Completed Actions**
+1. ✅ Separated presentation vs. behavior: RoomCard now lightweight, moved "next status" business logic to `RoomDashboardViewModel`.
+2. ✅ Created dedicated chip subviews with shared styling under `Views/Components/Room/`:
+   - `OccupancyChipView.swift` - Reusable occupancy status chip with animation
+   - `CleaningChipView.swift` - Reusable cleaning status chip with animation
+   - `FlagBadgeRow.swift` - Reusable flag badge display with overflow handling
+3. ✅ Moved animation state into the individual chip subviews, simplifying the parent card and enabling reuse across the app.
 
 ### `Views/RecentlyUpdatedView.swift` (≈413 LOC)
 **Issues**

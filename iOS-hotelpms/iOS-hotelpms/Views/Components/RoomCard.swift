@@ -8,9 +8,8 @@ struct RoomCard: View {
     let isSelected: Bool
     let isCompressed: Bool
     let recentNotes: [RoomNote]
-    
-    @State private var occupancyScale: CGFloat = 1.0
-    @State private var cleaningScale: CGFloat = 1.0
+    let nextOccupancyStatus: (OccupancyStatus) -> OccupancyStatus
+    let nextCleaningStatus: (CleaningStatus) -> CleaningStatus
     
     init(
         room: Room, 
@@ -19,7 +18,9 @@ struct RoomCard: View {
         onCleaningTap: ((CleaningStatus) -> Void)? = nil,
         isSelected: Bool = false,
         isCompressed: Bool = false,
-        recentNotes: [RoomNote] = []
+        recentNotes: [RoomNote] = [],
+        nextOccupancyStatus: @escaping (OccupancyStatus) -> OccupancyStatus = { _ in .vacant },
+        nextCleaningStatus: @escaping (CleaningStatus) -> CleaningStatus = { _ in .dirty }
     ) {
         self.room = room
         self.onTap = onTap
@@ -28,6 +29,8 @@ struct RoomCard: View {
         self.isSelected = isSelected
         self.isCompressed = isCompressed
         self.recentNotes = recentNotes
+        self.nextOccupancyStatus = nextOccupancyStatus
+        self.nextCleaningStatus = nextCleaningStatus
     }
     
     var body: some View {
@@ -43,14 +46,7 @@ struct RoomCard: View {
                     Spacer()
                     
                     // Flag badges (show up to 2)
-                    if room.hasFlags {
-                        HStack(spacing: 2) {
-                            ForEach(Array(room.flags.prefix(2)), id: \.self) { flag in
-                                Text(flagEmoji(for: flag))
-                                    .font(.caption)
-                            }
-                        }
-                    }
+                    FlagBadgeRow(flags: room.flags, maxDisplayed: 2)
                     
                     // Status icon based on priority
                     statusIcon
@@ -59,12 +55,26 @@ struct RoomCard: View {
                 // Status Badges Row
                 HStack(spacing: 8) {
                     // Occupancy Badge
-                    occupancyBadge
+                    OccupancyChipView(
+                        status: room.occupancyStatus,
+                        isCompressed: isCompressed,
+                        onTap: onOccupancyTap != nil ? {
+                            let nextStatus = nextOccupancyStatus(room.occupancyStatus)
+                            onOccupancyTap!(nextStatus)
+                        } : nil
+                    )
                     
                     Spacer()
                     
                     // Cleaning Badge  
-                    cleaningBadge
+                    CleaningChipView(
+                        status: room.cleaningStatus,
+                        isCompressed: isCompressed,
+                        onTap: onCleaningTap != nil ? {
+                            let nextStatus = nextCleaningStatus(room.cleaningStatus)
+                            onCleaningTap!(nextStatus)
+                        } : nil
+                    )
                 }
                 
                 Spacer()
@@ -137,98 +147,6 @@ struct RoomCard: View {
         }
     }
     
-    // MARK: - Occupancy Badge
-    private var occupancyBadge: some View {
-        Button(action: {
-            guard let onOccupancyTap = onOccupancyTap else { return }
-            
-            // Animate the chip
-            withAnimation(.easeInOut(duration: 0.1)) {
-                occupancyScale = 0.95
-            }
-            
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                occupancyScale = 1.0
-            }
-            
-            // Cycle through occupancy statuses
-            let nextStatus = nextOccupancyStatus(from: room.occupancyStatus)
-            onOccupancyTap(nextStatus)
-            
-        }) {
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(colorForOccupancy(room.occupancyStatus))
-                    .frame(width: 8, height: 8)
-                
-                if !isCompressed {
-                    Text(room.occupancyStatus.displayName)
-                        .font(.footnote)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                        .truncationMode(.tail)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(colorForOccupancy(room.occupancyStatus).opacity(0.15))
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(colorForOccupancy(room.occupancyStatus), lineWidth: 1)
-            )
-        }
-        .scaleEffect(occupancyScale)
-        .buttonStyle(PlainButtonStyle())
-    }
-    
-    // MARK: - Cleaning Badge
-    private var cleaningBadge: some View {
-        Button(action: {
-            guard let onCleaningTap = onCleaningTap else { return }
-            
-            // Animate the chip
-            withAnimation(.easeInOut(duration: 0.1)) {
-                cleaningScale = 0.95
-            }
-            
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                cleaningScale = 1.0
-            }
-            
-            // Cycle through cleaning statuses
-            let nextStatus = nextCleaningStatus(from: room.cleaningStatus)
-            onCleaningTap(nextStatus)
-            
-        }) {
-            HStack(spacing: 4) {
-                Image(systemName: room.cleaningStatus.systemImage)
-                    .font(.system(size: 10))
-                    .foregroundColor(colorForCleaning(room.cleaningStatus))
-                
-                if !isCompressed {
-                    Text(room.cleaningStatus.displayName)
-                        .font(.footnote)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                        .truncationMode(.tail)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(colorForCleaning(room.cleaningStatus).opacity(0.15))
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(colorForCleaning(room.cleaningStatus), lineWidth: 1)
-            )
-        }
-        .scaleEffect(cleaningScale)
-        .buttonStyle(PlainButtonStyle())
-    }
     
     
     
@@ -245,62 +163,6 @@ struct RoomCard: View {
         return Color(.systemGray4)
     }
     
-    
-    // MARK: - Status Cycling Logic
-    private func nextOccupancyStatus(from current: OccupancyStatus) -> OccupancyStatus {
-        switch current {
-        case .vacant: return .assigned
-        case .assigned: return .occupied
-        case .occupied: return .vacant
-        case .stayover: return .vacant
-        case .checkedOut: return .vacant
-        }
-    }
-    
-    private func nextCleaningStatus(from current: CleaningStatus) -> CleaningStatus {
-        switch current {
-        case .dirty: return .cleaningInProgress
-        case .cleaningInProgress: return .ready
-        case .ready: return .dirty
-        }
-    }
-    
-    // MARK: - Color Functions
-    private func colorForOccupancy(_ status: OccupancyStatus) -> Color {
-        switch status {
-        case .vacant: return .green
-        case .assigned: return .gray
-        case .occupied: return .blue
-        case .stayover: return .orange
-        case .checkedOut: return .red
-        }
-    }
-    
-    private func colorForCleaning(_ status: CleaningStatus) -> Color {
-        switch status {
-        case .dirty: return .red
-        case .cleaningInProgress: return .yellow
-        case .ready: return .green
-        }
-    }
-    
-    private func colorForFlag(_ flag: RoomFlag) -> Color {
-        switch flag {
-        case .maintenanceRequired: return .orange
-        case .outOfOrder: return .red
-        case .outOfService: return .red
-        case .dnd: return .purple
-        }
-    }
-    
-    private func flagEmoji(for flag: RoomFlag) -> String {
-        switch flag {
-        case .maintenanceRequired: return "🔧"
-        case .outOfOrder: return "🚫"
-        case .outOfService: return "🚫"
-        case .dnd: return "🌙"
-        }
-    }
 }
 
 #Preview {
@@ -311,13 +173,16 @@ struct RoomCard: View {
     ], spacing: 16) {
         RoomCard(
             room: Room(
+                id: UUID(),
                 hotelId: UUID(),
                 roomNumber: 205,
                 floorNumber: 2,
                 occupancyStatus: .occupied,
                 cleaningStatus: .ready,
                 flags: [],
-                notes: "Guest requested extra towels and late checkout"
+                notes: "Guest requested extra towels and late checkout",
+                createdAt: Date(),
+                updatedAt: Date()
             ),
             onTap: {},
             isSelected: true
@@ -325,13 +190,16 @@ struct RoomCard: View {
         
         RoomCard(
             room: Room(
+                id: UUID(),
                 hotelId: UUID(),
                 roomNumber: 310,
                 floorNumber: 3,
                 occupancyStatus: .vacant,
                 cleaningStatus: .dirty,
                 flags: [.maintenanceRequired],
-                notes: "AC not working properly"
+                notes: "AC not working properly",
+                createdAt: Date(),
+                updatedAt: Date()
             ),
             onTap: {},
             isSelected: false
@@ -339,13 +207,16 @@ struct RoomCard: View {
         
         RoomCard(
             room: Room(
+                id: UUID(),
                 hotelId: UUID(),
                 roomNumber: 150,
                 floorNumber: 1,
                 occupancyStatus: .assigned,
                 cleaningStatus: .cleaningInProgress,
                 flags: [.dnd, .outOfOrder],
-                notes: nil
+                notes: "",
+                createdAt: Date(),
+                updatedAt: Date()
             ),
             onTap: {},
             isSelected: false
@@ -354,13 +225,16 @@ struct RoomCard: View {
         // Test card with long status text to verify no truncation
         RoomCard(
             room: Room(
+                id: UUID(),
                 hotelId: UUID(),
                 roomNumber: 250,
                 floorNumber: 2,
                 occupancyStatus: .stayover,
                 cleaningStatus: .cleaningInProgress,
                 flags: [.maintenanceRequired],
-                notes: "Long notes text to test preview"
+                notes: "Long notes text to test preview",
+                createdAt: Date(),
+                updatedAt: Date()
             ),
             onTap: {},
             isSelected: false
@@ -369,13 +243,16 @@ struct RoomCard: View {
         // Test card in compressed mode (icons only)
         RoomCard(
             room: Room(
+                id: UUID(),
                 hotelId: UUID(),
                 roomNumber: 301,
                 floorNumber: 3,
                 occupancyStatus: .occupied,
                 cleaningStatus: .dirty,
                 flags: [.dnd],
-                notes: "Compressed mode test"
+                notes: "Compressed mode test",
+                createdAt: Date(),
+                updatedAt: Date()
             ),
             onTap: {},
             isSelected: false,
