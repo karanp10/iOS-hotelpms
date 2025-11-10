@@ -13,9 +13,12 @@ class ServiceManager: ObservableObject {
     @Published private(set) var auditService: AuditService
     @Published private(set) var databaseService: DatabaseService
     @Published private(set) var authService: AuthService
+    @Published private(set) var historyService: HistoryService
     
     // MARK: - Current User Context
     @Published var currentUserId: UUID? = nil // Should be set by authentication system
+    @Published var currentUserRole: HotelRole? = nil
+    @Published var currentHotelId: UUID? = nil
     
     // MARK: - Global Loading States
     @Published var isLoadingRooms = false
@@ -33,6 +36,7 @@ class ServiceManager: ObservableObject {
         self.auditService = AuditService()
         self.databaseService = DatabaseService()
         self.authService = AuthService()
+        self.historyService = HistoryService()
     }
     
     // MARK: - Service Access Methods
@@ -48,6 +52,27 @@ class ServiceManager: ObservableObject {
     /// Update current user context
     func setCurrentUser(_ userId: UUID?) {
         currentUserId = userId
+    }
+    
+    /// Get user role for a specific hotel
+    @MainActor
+    func getUserRole(for hotelId: UUID) async -> HotelRole? {
+        guard let userId = currentUserId else { return nil }
+        
+        do {
+            let membership = try await databaseService.getUserMembership(userId: userId, hotelId: hotelId)
+            currentUserRole = membership?.role
+            currentHotelId = hotelId
+            return membership?.role
+        } catch {
+            handleError(error)
+            return nil
+        }
+    }
+    
+    /// Check if current user has admin access for current hotel
+    var hasAdminAccess: Bool {
+        return currentUserRole?.hasAdminAccess ?? false
     }
     
     // MARK: - Error Handling

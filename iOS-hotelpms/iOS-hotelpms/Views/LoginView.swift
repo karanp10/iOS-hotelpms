@@ -17,6 +17,7 @@ struct LoginView: View {
     
     @StateObject private var authService = AuthService()
     @StateObject private var databaseService = DatabaseService()
+    @StateObject private var serviceManager = ServiceManager.shared
     
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     
@@ -112,6 +113,9 @@ struct LoginView: View {
             // Step 1: Sign in with Supabase Auth
             let user = try await authService.signIn(email: email, password: password)
             
+            // Step 1.5: Set current user in ServiceManager
+            serviceManager.setCurrentUser(user.id)
+            
             // Step 2: Check user's hotel memberships and room status
             let membershipsCount = try await databaseService.getUserMembershipsCount()
             
@@ -124,9 +128,15 @@ struct LoginView: View {
                     // Some hotels need room setup - navigate to hotel selection
                     navigationManager.navigate(to: .hotelSelection)
                 } else {
-                    // All hotels are configured - navigate to first hotel's dashboard
+                    // All hotels are configured - check user role and navigate to appropriate dashboard
                     if let firstHotel = hotelsWithRoomCounts.first {
-                        navigationManager.navigate(to: .roomDashboard(hotelId: firstHotel.id))
+                        let userRole = await serviceManager.getUserRole(for: firstHotel.id)
+                        
+                        if userRole?.hasAdminAccess == true {
+                            navigationManager.navigate(to: .adminDashboard(hotelId: firstHotel.id))
+                        } else {
+                            navigationManager.navigate(to: .roomDashboard(hotelId: firstHotel.id))
+                        }
                     } else {
                         alertMessage = "No hotels found."
                         showingAlert = true

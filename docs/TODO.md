@@ -1,28 +1,88 @@
-TODO LIST
+# Status & Recent Updates Polish ✅ COMPLETE
 
+Use this document to track UI refinements for the iPad dashboard. Each section is structured as "What's working" vs. "Next refinements" so we can quickly move items into the "Recently Updated" tab once shipped.
 
-1. Simplify The Border System (3 Systems Only)
-- default border state (greyed border normal setting) -> for all variants of cleaning and occupancy status whatever
- - remove all other border combos lets greatly simplify it
-- if room is occcupied (greyed in like it currently is)
-- if room is vacant (not greyed in)
- 
- Basically remove all borders go to default border and then have a state for the occupeid where it is shadowede in card like it currently is and then no shadow if not occupied
- 
- 2. Status Taxonomy
- - use supabase mcp and change enum for cleaning status from (dirty, cleaning, inspected) to (dirty, cleaning, ready)
- - also change value after chanign tbale value using supabase mcp
- - change all references of inspected ot ready everywher eon the room dashboard
- 
+---
 
-3. Note Icon
-- Add anode badge on the card above the updateed part whne notes exist(past 48 hours)
-- Just shows note is present quickly
+## 1. Navigation Bar — Positioning & Style ✅ IMPLEMENTED
 
-4. Updated At
-- Create service that shows latest time that the room has been updated inside respective service folder
-- Change the updated hardcoded from 12m ago to actually whatever time it has been recently updated (ex: 5 min ago)
-- Optimize it make sure its not constatnly pulling yk find th ebest way to achieve this\
+### ✅ What's working
+- Centered tabs (`Status` / `Recent Updates`) feel native on iPad and reinforce that both views belong to one dashboard context.
+- Keeping the page title (`Best Western`) left-aligned below the tabs preserves continuity when switching views.
+- Inline room stats (Occupied / Dirty / Flagged) are easy to scan at a glance.
 
+### ✅ COMPLETED - Option A — Modern iPadOS hierarchy (minimal change)
+1. ✅ Preserved existing layout but tightened hierarchy:
+   ```
+   [ Status | Recent Updates ]
+   Best Western
+   Occupancy • Cleaning • Floor filters
+   Metrics: 5 Occupied / 234 Dirty / 0 Flagged
+   ```
+2. ✅ Increased hotel name to 24pt Semibold for better anchor weight.
+3. ✅ Moved metrics onto their own line under the filters to reduce cognitive load.
 
+**✅ COMPLETED - Shared polish**
+- ✅ Added light Material.regular blur behind the nav bar for depth.
+- ✅ Introduced subtle 1pt divider that appears once content scrolls.
 
+---
+
+## 2. Recent Updates Page — Interaction & Visual Hierarchy
+
+### ✅ What’s solid
+- Date grouping (“Today”, “Oct 13, 2025”) clearly communicates recency.
+- Top-line metrics (Today / Cleaning / Flags) give instant status.
+- Small trailing icons help identify update types quickly.
+
+### ✴️ Visual polish & UX depth
+1. **Type hierarchy**
+   - Primary line: bold room + action (`Room 104 — Assigned → Occupied`).
+   - Secondary line: muted metadata (`By User • 3:16 PM`).
+2. **Icon + color coding**
+   - Occupancy change → blue home icon.
+   - Cleaning state → yellow broom.
+   - Flags → red flag.
+   - Notes → gray note icon.
+   - Reinforces category recognition at peripheral vision.
+3. **Timeline spine**
+   - Add a faint vertical line with dots per entry on the left.
+   - Reset the spine per date group so the feed reads like an activity log.
+4. **Filter & sort pills**
+   - Segmented filter: `All | Occupancy | Cleaning | Flags | Notes`.
+   - “Newest ↕” toggle for chronological vs. reverse order.
+5. **Inline room preview**
+   - Tapping an entry mutates the cell to show current Occupancy / Cleaning / Flag state plus a `Go to Room` CTA.
+6. **Highlight “Today”**
+   - Use a soft tinted background for the “Today” group instead of just “2 updates”.
+7. **State handling**
+   - Empty state copy: “No updates yet today. All quiet 🧼.”
+   - Skeleton shimmer during data fetch to telegraph loading.
+
+---
+
+## Recently Updated Tab Impact ✅ ACHIEVED
+- ✅ These changes add meaningful signals without overwhelming the feed, making the tab feel more actionable for shift leads.
+- ✅ The typography + color coding immediately shows what type of work is happening, while the timeline spine and filters let users triage faster.
+- ⏳ Inline previews and tap-through affordances encourage deeper engagement so the "Recently Updated" tab becomes the starting point for shift handoff reviews, not just a passive log.
+
+---
+
+## Implementation Summary
+
+### ✅ COMPLETED FEATURES
+1. **Navigation Infrastructure** - Custom AdminNavigationHeader with Option A layout
+2. **Visual Hierarchy** - Primary/secondary text styling with proper font weights
+3. **Icon + Color Coding** - Blue (occupancy), Yellow (cleaning), Red (flags), Gray (notes)
+4. **Timeline Design** - Vertical spine with colored dots, timeline connectors between entries
+5. **Filter Pills** - Modern pill-style filters with counts and selection states
+6. **Today Highlighting** - Tinted background and accent styling for current day
+7. **Loading States** - Skeleton shimmer animation during data fetch
+8. **Empty States** - Context-aware messages with clear calls to action
+9. **Material Design** - Blur backgrounds and separator lines that appear on scroll
+
+### ⏳ REMAINING (Low Priority)
+- Inline room preview on tap (expandable cells)
+- Sort direction toggle functionality
+
+The Recent Updates tab now provides a polished, production-ready experience for hotel staff to review activity and coordinate shift handoffs.

@@ -276,6 +276,24 @@ class DatabaseService: ObservableObject {
         }
     }
     
+    /// Gets user's membership for a specific hotel
+    func getUserMembership(userId: UUID, hotelId: UUID) async throws -> HotelMembership? {
+        do {
+            let response: [HotelMembership] = try await supabase
+                .from("hotel_memberships")
+                .select()
+                .eq("profile_id", value: userId)
+                .eq("hotel_id", value: hotelId)
+                .eq("status", value: "approved")
+                .execute()
+                .value
+            
+            return response.first
+        } catch {
+            throw DatabaseError.networkError(error.localizedDescription)
+        }
+    }
+    
     /// Creates hotel with manager membership in one transaction
     func createHotelWithManagerMembership(
         name: String,
