@@ -2,7 +2,7 @@ import SwiftUI
 
 struct HotelSelectionView: View {
     @EnvironmentObject var navigationManager: NavigationManager
-    @StateObject private var databaseService = DatabaseService()
+    @StateObject private var hotelService = HotelService()
     
     @State private var hotels: [HotelWithRoomCount] = []
     @State private var isLoading = true
@@ -80,7 +80,7 @@ struct HotelSelectionView: View {
         isLoading = true
         
         do {
-            hotels = try await databaseService.getUserHotelsWithRoomCounts()
+            hotels = try await hotelService.getUserHotelsWithRoomCounts()
             
             // Auto-navigate if user has exactly one hotel that needs room setup
             if hotels.count == 1 && hotels[0].needsRoomSetup {

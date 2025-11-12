@@ -1,226 +1,159 @@
 import Foundation
 import Supabase
 
+/// Unified service for room operations, combining repository and mutations with clean separation of concerns.
+/// Uses generic patch helpers to reduce boilerplate and improve maintainability.
 class RoomService {
     
-    private let supabaseClient: SupabaseClient
+    // MARK: - Dependencies
+    private let repository: RoomRepository
+    private let mutations: RoomMutations
     
     init(supabaseClient: SupabaseClient? = nil) {
-        self.supabaseClient = supabaseClient ?? SupabaseManager.shared.client
+        let client = supabaseClient ?? SupabaseManager.shared.client
+        self.repository = RoomRepository(supabaseClient: client)
+        self.mutations = RoomMutations(supabaseClient: client, repository: self.repository)
     }
     
-    // MARK: - Room Retrieval
+    // MARK: - Repository Methods (Read Operations)
     
+    /// Get all rooms for a hotel
     func getRooms(hotelId: UUID) async throws -> [Room] {
-        do {
-            let response: [Room] = try await supabaseClient
-                .from("rooms")
-                .select()
-                .eq("hotel_id", value: hotelId)
-                .order("room_number", ascending: true)
-                .execute()
-                .value
-            
-            return response
-        } catch {
-            throw DatabaseError.networkError("Failed to get rooms: \(error.localizedDescription)")
-        }
+        return try await repository.getRooms(hotelId: hotelId)
     }
     
-    // MARK: - Room Status Updates
-    
-    func updateOccupancyStatus(roomId: UUID, newStatus: OccupancyStatus, updatedBy: UUID?) async throws {
-        do {
-            let updateRequest = RoomOccupancyUpdate(
-                occupancyStatus: newStatus.rawValue,
-                updatedBy: updatedBy,
-                updatedAt: Date().ISO8601Format()
-            )
-            
-            let _ = try await supabaseClient
-                .from("rooms")
-                .update(updateRequest)
-                .eq("id", value: roomId)
-                .execute()
-            
-        } catch {
-            throw DatabaseError.networkError("Failed to update occupancy status: \(error.localizedDescription)")
-        }
+    /// Get a specific room by ID
+    func getRoom(id: UUID) async throws -> Room {
+        return try await repository.getRoom(id: id)
     }
     
-    func updateCleaningStatus(roomId: UUID, newStatus: CleaningStatus, updatedBy: UUID?) async throws {
-        do {
-            let updateRequest = RoomCleaningUpdate(
-                cleaningStatus: newStatus.rawValue,
-                updatedBy: updatedBy,
-                updatedAt: Date().ISO8601Format()
-            )
-            
-            let _ = try await supabaseClient
-                .from("rooms")
-                .update(updateRequest)
-                .eq("id", value: roomId)
-                .execute()
-            
-        } catch {
-            throw DatabaseError.networkError("Failed to update cleaning status: \(error.localizedDescription)")
-        }
+    /// Get rooms by floor
+    func getRoomsByFloor(hotelId: UUID, floor: Int) async throws -> [Room] {
+        return try await repository.getRoomsByFloor(hotelId: hotelId, floor: floor)
     }
     
-    // MARK: - Flag Management
-    
-    func toggleFlag(roomId: UUID, flag: RoomFlag, updatedBy: UUID?) async throws {
-        do {
-            // First get current room to check existing flags
-            let currentRooms: [Room] = try await supabaseClient
-                .from("rooms")
-                .select()
-                .eq("id", value: roomId)
-                .execute()
-                .value
-            
-            guard let currentRoom = currentRooms.first else {
-                throw DatabaseError.networkError("Room not found")
-            }
-            
-            // Toggle flag in array
-            var newFlags = currentRoom.flags
-            if newFlags.contains(flag) {
-                newFlags.removeAll { $0 == flag }
-            } else {
-                newFlags.append(flag)
-            }
-            
-            // Update room with new flags
-            let updateRequest = RoomFlagsUpdate(
-                flags: newFlags.map { $0.rawValue },
-                updatedBy: updatedBy,
-                updatedAt: Date().ISO8601Format()
-            )
-            
-            let _ = try await supabaseClient
-                .from("rooms")
-                .update(updateRequest)
-                .eq("id", value: roomId)
-                .execute()
-            
-        } catch {
-            throw DatabaseError.networkError("Failed to toggle flag: \(error.localizedDescription)")
-        }
+    /// Get rooms by occupancy status
+    func getRoomsByOccupancy(hotelId: UUID, status: OccupancyStatus) async throws -> [Room] {
+        return try await repository.getRoomsByOccupancy(hotelId: hotelId, status: status)
     }
     
-    // MARK: - Room Creation
+    /// Get rooms by cleaning status
+    func getRoomsByCleaning(hotelId: UUID, status: CleaningStatus) async throws -> [Room] {
+        return try await repository.getRoomsByCleaning(hotelId: hotelId, status: status)
+    }
     
+    /// Get rooms with specific flags
+    func getRoomsWithFlags(hotelId: UUID, flags: [RoomFlag]) async throws -> [Room] {
+        return try await repository.getRoomsWithFlags(hotelId: hotelId, flags: flags)
+    }
+    
+    /// Search rooms by number
+    func searchRooms(hotelId: UUID, query: String) async throws -> [Room] {
+        return try await repository.searchRooms(hotelId: hotelId, query: query)
+    }
+    
+    /// Get room statistics for a hotel
+    func getRoomStats(hotelId: UUID) async throws -> RoomStats {
+        return try await repository.getRoomStats(hotelId: hotelId)
+    }
+    
+    // MARK: - Mutation Methods (Write Operations)
+    
+    /// Create a single room
     func createRoom(_ request: CreateRoomRequest) async throws {
-        do {
-            let _ = try await supabaseClient
-                .from("rooms")
-                .insert(request)
-                .execute()
-            
-        } catch {
-            throw DatabaseError.networkError("Failed to create room: \(error.localizedDescription)")
-        }
+        return try await mutations.createRoom(request)
     }
     
-    // MARK: - Room Updates (Batch)
-    
-    func updateRoom(roomId: UUID, updates: RoomUpdateRequest, updatedBy: UUID?) async throws {
-        do {
-            let updateRequest = RoomBatchUpdate(
-                occupancyStatus: updates.occupancyStatus?.rawValue,
-                cleaningStatus: updates.cleaningStatus?.rawValue,
-                flags: updates.flags?.map { $0.rawValue },
-                notes: updates.notes,
-                updatedBy: updatedBy,
-                updatedAt: Date().ISO8601Format()
-            )
-            
-            let _ = try await supabaseClient
-                .from("rooms")
-                .update(updateRequest)
-                .eq("id", value: roomId)
-                .execute()
-            
-        } catch {
-            throw DatabaseError.networkError("Failed to update room: \(error.localizedDescription)")
-        }
+    /// Create multiple rooms
+    func createRooms(_ requests: [CreateRoomRequest]) async throws {
+        return try await mutations.createRooms(requests)
     }
-}
-
-// MARK: - Supporting Types
-
-struct RoomUpdateRequest {
-    let occupancyStatus: OccupancyStatus?
-    let cleaningStatus: CleaningStatus?
-    let flags: [RoomFlag]?
-    let notes: String?
     
-    init(
-        occupancyStatus: OccupancyStatus? = nil,
-        cleaningStatus: CleaningStatus? = nil,
+    /// Update occupancy status
+    func updateOccupancyStatus(roomId: UUID, newStatus: OccupancyStatus, updatedBy: UUID) async throws {
+        return try await mutations.updateOccupancyStatus(roomId: roomId, newStatus: newStatus, updatedBy: updatedBy)
+    }
+    
+    /// Update cleaning status
+    func updateCleaningStatus(roomId: UUID, newStatus: CleaningStatus, updatedBy: UUID) async throws {
+        return try await mutations.updateCleaningStatus(roomId: roomId, newStatus: newStatus, updatedBy: updatedBy)
+    }
+    
+    /// Toggle a room flag
+    func toggleFlag(roomId: UUID, flag: RoomFlag, updatedBy: UUID) async throws {
+        return try await mutations.toggleFlag(roomId: roomId, flag: flag, updatedBy: updatedBy)
+    }
+    
+    /// Set room flags (replaces all existing flags)
+    func setFlags(roomId: UUID, flags: [RoomFlag], updatedBy: UUID) async throws {
+        return try await mutations.setFlags(roomId: roomId, flags: flags, updatedBy: updatedBy)
+    }
+    
+    /// Add a single flag to room
+    func addFlag(roomId: UUID, flag: RoomFlag, updatedBy: UUID) async throws {
+        return try await mutations.addFlag(roomId: roomId, flag: flag, updatedBy: updatedBy)
+    }
+    
+    /// Remove a single flag from room
+    func removeFlag(roomId: UUID, flag: RoomFlag, updatedBy: UUID) async throws {
+        return try await mutations.removeFlag(roomId: roomId, flag: flag, updatedBy: updatedBy)
+    }
+    
+    /// Generic room update using patch
+    func updateRoom(id: UUID, patch: RoomPatch) async throws {
+        return try await mutations.updateRoom(id: id, patch: patch)
+    }
+    
+    /// Update room with multiple changes
+    func updateRoomStatus(
+        roomId: UUID,
+        occupancy: OccupancyStatus? = nil,
+        cleaning: CleaningStatus? = nil,
         flags: [RoomFlag]? = nil,
-        notes: String? = nil
-    ) {
-        self.occupancyStatus = occupancyStatus
-        self.cleaningStatus = cleaningStatus
-        self.flags = flags
-        self.notes = notes
+        updatedBy: UUID
+    ) async throws {
+        return try await mutations.updateRoomStatus(
+            roomId: roomId,
+            occupancy: occupancy,
+            cleaning: cleaning,
+            flags: flags,
+            updatedBy: updatedBy
+        )
     }
-}
-
-// MARK: - Codable Update Structs
-
-struct RoomOccupancyUpdate: Codable {
-    let occupancyStatus: String
-    let updatedBy: UUID?
-    let updatedAt: String
     
-    enum CodingKeys: String, CodingKey {
-        case occupancyStatus = "occupancy_status"
-        case updatedBy = "updated_by"
-        case updatedAt = "updated_at"
+    /// Batch update multiple rooms
+    func updateRoomBatch(updates: [(UUID, RoomPatch)]) async throws {
+        return try await mutations.updateRoomBatch(updates: updates)
     }
-}
-
-struct RoomCleaningUpdate: Codable {
-    let cleaningStatus: String
-    let updatedBy: UUID?
-    let updatedAt: String
     
-    enum CodingKeys: String, CodingKey {
-        case cleaningStatus = "cleaning_status"
-        case updatedBy = "updated_by"
-        case updatedAt = "updated_at"
+    /// Delete a room
+    func deleteRoom(id: UUID) async throws {
+        return try await mutations.deleteRoom(id: id)
     }
-}
-
-struct RoomFlagsUpdate: Codable {
-    let flags: [String]
-    let updatedBy: UUID?
-    let updatedAt: String
     
-    enum CodingKeys: String, CodingKey {
-        case flags
-        case updatedBy = "updated_by"
-        case updatedAt = "updated_at"
+    // MARK: - Legacy Support (Backward Compatibility)
+    
+    @available(*, deprecated, message: "Use updateOccupancyStatus with required updatedBy parameter")
+    func updateOccupancyStatus(roomId: UUID, newStatus: OccupancyStatus, updatedBy: UUID?) async throws {
+        guard let userId = updatedBy else {
+            throw RoomServiceError.invalidRoomData
+        }
+        try await updateOccupancyStatus(roomId: roomId, newStatus: newStatus, updatedBy: userId)
     }
-}
-
-struct RoomBatchUpdate: Codable {
-    let occupancyStatus: String?
-    let cleaningStatus: String?
-    let flags: [String]?
-    let notes: String?
-    let updatedBy: UUID?
-    let updatedAt: String
     
-    enum CodingKeys: String, CodingKey {
-        case occupancyStatus = "occupancy_status"
-        case cleaningStatus = "cleaning_status"
-        case flags
-        case notes
-        case updatedBy = "updated_by"
-        case updatedAt = "updated_at"
+    @available(*, deprecated, message: "Use updateCleaningStatus with required updatedBy parameter")
+    func updateCleaningStatus(roomId: UUID, newStatus: CleaningStatus, updatedBy: UUID?) async throws {
+        guard let userId = updatedBy else {
+            throw RoomServiceError.invalidRoomData
+        }
+        try await updateCleaningStatus(roomId: roomId, newStatus: newStatus, updatedBy: userId)
+    }
+    
+    @available(*, deprecated, message: "Use toggleFlag with required updatedBy parameter")
+    func toggleFlag(roomId: UUID, flag: RoomFlag, updatedBy: UUID?) async throws {
+        guard let userId = updatedBy else {
+            throw RoomServiceError.invalidRoomData
+        }
+        try await toggleFlag(roomId: roomId, flag: flag, updatedBy: userId)
     }
 }

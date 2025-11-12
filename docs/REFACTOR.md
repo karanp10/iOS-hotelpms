@@ -45,93 +45,144 @@ This document captures the current problem areas in the codebase and the concret
    - `FlagBadgeRow.swift` - Reusable flag badge display with overflow handling
 3. ✅ Moved animation state into the individual chip subviews, simplifying the parent card and enabling reuse across the app.
 
-### `Views/RecentlyUpdatedView.swift` (≈413 LOC)
+### ✅ COMPLETED - `Views/RecentlyUpdatedView.swift` (413 LOC → 75 LOC)
 **Issues**
-- Handles data fetching, filtering, grouping, empty states, and defines row components inline.
+- ✅ RESOLVED: Handled data fetching, filtering, grouping, empty states, and defined row components inline.
 
-**Actions**
-1. Add `RecentlyUpdatedViewModel` that owns loading/error states, filtering, search text, grouped sections, and refresh logic.
-2. Break UI into `RecentUpdatesHeader`, `HistoryFilterMenu`, `HistorySectionList`, `HistoryEntryRow`, and `SummaryChip` components.
-3. Move date-formatting helpers into either the view model or a small `HistoryFormatter`.
+**Completed Actions**
+1. ✅ Created `RecentlyUpdatedViewModel` that owns loading/error states, filtering, search text, grouped sections, and refresh logic.
+2. ✅ Split UI into components under `Views/Components/RecentUpdates/`:
+   - `RecentUpdatesHeader.swift` - Title, summary chips, and search/filter controls
+   - `HistoryFilterMenu.swift` - Reusable filter dropdown with icons and selection state
+   - `HistorySectionList.swift` - Grouped history list with section headers
+   - `HistoryEntryRow.swift` - Individual history entry display with user avatars and type badges
+   - `SummaryChip.swift` - Reusable status summary chips
+3. ✅ Moved date-formatting helpers and `HistoryFilter` enum into the view model for centralized logic.
+4. ✅ Extracted toast/undo logic into reusable components that other screens can leverage.
 
-### `Views/RoomSetupView.swift` (≈319 LOC)
+### ✅ COMPLETED - `Views/RoomSetupView.swift` (319 LOC → 59 LOC)
 **Issues**
-- Bundles the `RoomRange` model, validation, overlap detection, Supabase writes, and UI.
+- ✅ RESOLVED: Bundled the `RoomRange` model, validation, overlap detection, Supabase writes, and UI all in one file.
 
-**Actions**
-1. Move `RoomRange` plus validation helpers into `Models/RoomRange.swift`.
-2. Introduce `RoomSetupViewModel` that mutates ranges, exposes validation state, and calls a dedicated service for room creation.
-3. Keep the view responsible only for presenting fields, validation messaging, and invoking the view model’s async actions.
-
----
-
-## Secondary View Cleanups
-
-- **Onboarding/Auth views** (`PersonalInfoView`, `ManagerHotelSetupView`, `EmployeeJoinView`, `HotelSelectionView`, `LoginView`)
-  - Factor out the shared `GeometryReader + AdaptiveLayout` scaffolding into an `OnboardingFormContainer`.
-  - Give each screen a view model to manage validation, API calls, and navigation events instead of binding directly to `DatabaseService`/`AuthService`.
-  - Extract shared components (form headers, primary buttons, alert banner) to reduce duplication.
-
-- **`Views/EmployeeJoinView.swift`**
-  - Move hotel search/request logic to `EmployeeJoinViewModel`.
-  - Relocate `HotelCard` to `Views/Components/Hotel/HotelCard.swift`.
-  - Introduce a reusable `SearchBar` component for other screens.
-
-- **`Views/ManagerHotelSetupView.swift`**
-  - Create `ManagerHotelSetupViewModel` that manages focus state, validation, and Supabase calls.
-  - Share input formatting/validation helpers with other onboarding screens.
-
-- **`Views/PersonalInfoView.swift`**
-  - Offload password validation + signup flow to `PersonalInfoViewModel`.
-  - Centralize error messaging and navigation decisions there.
+**Completed Actions**
+1. ✅ Created `Models/RoomRange.swift` with validation helpers and array extensions for overlap detection and total calculations.
+2. ✅ Created `RoomSetupViewModel` that manages ranges, exposes validation state, and handles hotel info loading and room creation.
+3. ✅ Split UI into components under `Views/Components/RoomSetup/`:
+   - `RoomSetupHeader.swift` - Title, hotel name, and description display
+   - `RoomRangesList.swift` - Dynamic list of room ranges with add/remove functionality
+   - `RoomRangeRow.swift` - Individual range input with validation feedback
+   - `ValidationSummary.swift` - Validation messages, totals, and create button
+4. ✅ Main view now only handles navigation structure and component composition, delegating all business logic to view model.
 
 ---
 
-## Service Layer Refactors
+## ✅ COMPLETED - Secondary View Cleanups
 
-- **`Services/DatabaseService.swift` (≈508 LOC)**
-  - Split into domain-specific services:
-    1. `ProfileService` – profile CRUD.
-    2. `HotelService` – hotel CRUD + metadata.
-    3. `MembershipService` – membership/join requests.
-    4. `RoomBatchService` – room setup/bulk insert helpers.
-  - Remove duplicated APIs (`getRooms`) already implemented in `RoomService`.
-  - Move DTOs (`CreateProfileRequest`, etc.) into dedicated files under `Models/Requests/`.
+- **✅ COMPLETED - Onboarding/Auth views** (`PersonalInfoView`, `ManagerHotelSetupView`, `EmployeeJoinView`)
+  - ✅ Created shared `OnboardingFormContainer` that factors out `GeometryReader + AdaptiveLayout` scaffolding.
+  - ✅ Added dedicated view models for each screen to manage validation, API calls, and navigation events.
+  - ✅ Extracted shared components under `Views/Components/Onboarding/`:
+    - `FormHeader.swift` - Standardized title and subtitle display
+    - `PrimaryButton.swift` - Reusable button with loading states
+    - `AlertBanner.swift` - Centralized alert handling
+    - `PasswordFields.swift` - Adaptive password input fields
+    - `BasicInfoFields.swift` - Hotel basic information inputs
+    - `LocationFields.swift` - Hotel location input fields
+    - `SearchBar.swift` - Reusable search component
+    - `HotelSearchResults.swift` - Hotel search results display
 
-- **`Services/ServiceManager.swift`**
-  - Convert into a lightweight dependency registry (or replace with dependency injection using protocols).
-  - Move orchestration logic (room updates, flag toggles, notes saves) into feature-specific view models or coordinators.
-  - Ensure errors bubble up through view models instead of global alerts inside the service manager.
+- **✅ COMPLETED - `Views/EmployeeJoinView.swift`**
+  - ✅ Created `EmployeeJoinViewModel` that manages hotel search/request logic.
+  - ✅ Moved `HotelCard` to `Views/Components/Hotel/HotelCard.swift`.
+  - ✅ Created reusable `SearchBar` component for other screens.
 
-- **`Services/NotesService.swift`**
-  - Keep this class strictly about note CRUD.
-  - Delegate audit logging to `AuditService` (pass a dependency in).
-  - Relocate `RoomHistoryRequest`/`RoomNote` models to `Models/RoomHistory`.
+- **✅ COMPLETED - `Views/ManagerHotelSetupView.swift`**
+  - ✅ Created `ManagerHotelSetupViewModel` that manages focus state, validation, and Supabase calls.
+  - ✅ Added input formatting/validation helpers shared across onboarding screens.
 
-- **`Services/AuditService.swift` + `Services/HistoryService.swift`**
-  - Merge into a single `RoomHistoryService` responsible for both logging and querying.
-  - Share request/response DTOs and avoid duplicating `RoomHistoryEntry` definitions.
-
-- **`Services/RoomService.swift`**
-  - Consider splitting read vs. write responsibilities (`RoomRepository` vs. `RoomMutations`).
-  - Replace bespoke Codable structs (`RoomOccupancyUpdate`, `RoomCleaningUpdate`, etc.) with a generic patch helper or builder to reduce boilerplate.
+- **✅ COMPLETED - `Views/PersonalInfoView.swift`**
+  - ✅ Created `PersonalInfoViewModel` that handles password validation and signup flow.
+  - ✅ Centralized error messaging and navigation decisions in view model.
 
 ---
 
-## Models & Stores
+## ✅ COMPLETED - Service Layer Refactors
 
-- **`Models/Room.swift`**
-  - Move enums (`OccupancyStatus`, `CleaningStatus`, `RoomFlag`) into `Models/Enums/`.
-  - Relocate request structs (`CreateRoomRequest`) into `Models/Requests/Room`.
-  - Keep `Room` focused on entity data + lightweight computed helpers.
+- **✅ COMPLETED - `Services/DatabaseService.swift` (508 LOC → Deprecated/Split)**
+  - ✅ Split into domain-specific services:
+    1. `ProfileService` – profile CRUD operations with ProfileServiceError enum
+    2. `HotelService` – hotel CRUD + metadata operations with HotelServiceError enum  
+    3. `MembershipService` – membership/join requests with MembershipServiceError enum
+    4. `RoomBatchService` – room setup/bulk insert helpers with RoomBatchServiceError enum
+  - ✅ Removed duplicated APIs (`getRooms`) - now properly delegated to `RoomService`
+  - ✅ Moved DTOs into dedicated files under `Models/Requests/`:
+    - `ProfileRequests.swift` - CreateProfileRequest
+    - `HotelRequests.swift` - CreateHotelRequest
+    - `MembershipRequests.swift` - CreateMembershipRequest, CreateJoinRequest
+  - ✅ Updated all ViewModels and Views to use new domain services:
+    - `RoomSetupViewModel`, `EmployeeJoinViewModel`, `ManagerHotelSetupViewModel` 
+    - `RoomDashboardViewModel`, `HotelSelectionView`, `LoginView`
+  - ✅ Updated `ServiceManager` to provide access to new domain services while maintaining backward compatibility
 
-- **History Models**
-  - Extract `RoomHistoryEntry`, `RoomHistoryRequest`, and related helpers from services into `Models/RoomHistory/`.
-  - Ensure both the activity feed and audit logging share the same models/formatters.
+- **✅ COMPLETED - `Services/ServiceManager.swift`**
+  - ✅ Converted into a lightweight dependency registry providing access to all domain services
+  - ✅ Moved orchestration logic into feature-specific view models:
+    - Room updates, flag toggles → `RoomDashboardViewModel` 
+    - Notes saves → `RoomDashboardViewModel`
+    - Audit logging → Integrated directly in ViewModels
+  - ✅ Removed global error handling - errors now bubble up through individual ViewModels
+  - ✅ Removed global loading states - ViewModels manage their own loading states
+  - ✅ Maintained user context management (currentUserId, currentHotelId, getUserRole)
 
-- **`Stores/RoomStore.swift`**
-  - Currently unused; decide whether to reintroduce it as the single source of truth for room data (backed by `RoomService`) or remove it entirely to avoid confusion.
-  - If retained, integrate it with the new dashboard view model so state is centralized.
+- **✅ COMPLETED - `Services/NotesService.swift`**
+  - ✅ Converted to focus strictly on note CRUD operations
+  - ✅ Removed audit logging - now delegated to AuditService in ViewModels
+  - ✅ Moved request models to `Models/Requests/NotesRequests.swift`
+  - ✅ Models already relocated to `Models/RoomHistory/RoomHistoryModels.swift`
+  - ✅ Added proper error handling with `NotesServiceError` enum
+  - ✅ Updated method signatures to return data for audit logging by callers
+  - ✅ Updated `RoomDashboardViewModel` to handle audit logging separately through AuditService
+
+- **✅ COMPLETED - `Services/AuditService.swift` + `Services/HistoryService.swift`**
+  - ✅ Merged into a single `RoomHistoryService` responsible for both audit logging and history querying
+  - ✅ Eliminated duplicated functionality between audit logging and history retrieval
+  - ✅ Consolidated shared DTOs - now using single `RoomHistoryEntry` model and `CreateAuditRequest` 
+  - ✅ Maintained all convenience methods for specific audit operations (occupancy, cleaning, flags, notes)
+  - ✅ Added proper error handling with `RoomHistoryServiceError` enum
+  - ✅ Updated `RoomDashboardViewModel` and `RecentlyUpdatedViewModel` to use new unified service
+  - ✅ Removed old `AuditService.swift` and `HistoryService.swift` files after migration
+  - ✅ Updated `ServiceManager` to provide `roomHistoryService` as single source for history operations
+
+- **✅ COMPLETED - `Services/RoomService.swift`**
+  - ✅ Split read vs. write responsibilities into `RoomRepository` and `RoomMutations` classes
+  - ✅ Replaced bespoke Codable structs with generic `RoomPatch` helper and `RoomPatchBuilder` pattern
+  - ✅ Eliminated code duplication from `RoomOccupancyUpdate`, `RoomCleaningUpdate`, `RoomFlagsUpdate`, `RoomBatchUpdate`
+  - ✅ Created unified `RoomService` that combines repository and mutations while maintaining clean API
+  - ✅ Added proper error handling with domain-specific `RoomServiceError` enum
+  - ✅ Enhanced functionality with new methods: `getRoom()`, `getRoomsByFloor()`, `getRoomsByOccupancy()`, `getRoomsByCleaning()`, `getRoomsWithFlags()`, `searchRooms()`, `getRoomStats()`
+  - ✅ Improved flag management with `setFlags()`, `addFlag()`, `removeFlag()` methods alongside `toggleFlag()`
+  - ✅ Added batch operations support with `createRooms()` and `updateRoomBatch()`
+  - ✅ Maintained backward compatibility with deprecated method signatures
+  - ✅ No changes required to existing ViewModels - method signatures already matched new architecture
+
+---
+
+## ✅ COMPLETED - Models & Stores
+
+- **✅ COMPLETED - `Models/Room.swift`**
+  - ✅ Moved enums (`OccupancyStatus`, `CleaningStatus`, `RoomFlag`) into `Models/Enums/RoomEnums.swift`
+  - ✅ Relocated request structs (`CreateRoomRequest`) into `Models/Requests/Room/RoomRequests.swift`
+  - ✅ Kept `Room` focused on entity data + lightweight computed helpers
+
+- **✅ COMPLETED - History Models**
+  - ✅ Extracted `RoomHistoryEntry`, `RoomHistoryRequest`, and `RoomNote` from services into `Models/RoomHistory/RoomHistoryModels.swift`
+  - ✅ Both activity feed and audit logging now share the same models/formatters
+  - ✅ Removed duplicated model definitions from `HistoryService.swift` and `NotesService.swift`
+
+- **✅ COMPLETED - `Stores/RoomStore.swift`**
+  - ✅ Removed unused RoomStore entirely to avoid confusion
+  - ✅ RoomDashboardViewModel already provides centralized room state management with optimistic updates
+  - ✅ Single source of truth maintained without duplicate state management
 
 ---
 

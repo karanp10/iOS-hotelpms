@@ -16,7 +16,8 @@ struct LoginView: View {
     @EnvironmentObject var navigationManager: NavigationManager
     
     @StateObject private var authService = AuthService()
-    @StateObject private var databaseService = DatabaseService()
+    @StateObject private var membershipService = MembershipService()
+    @StateObject private var hotelService = HotelService()
     @StateObject private var serviceManager = ServiceManager.shared
     
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
@@ -117,11 +118,11 @@ struct LoginView: View {
             serviceManager.setCurrentUser(user.id)
             
             // Step 2: Check user's hotel memberships and room status
-            let membershipsCount = try await databaseService.getUserMembershipsCount()
+            let membershipsCount = try await membershipService.getUserMembershipsCount()
             
             if membershipsCount > 0 {
                 // User has hotel memberships - check if any hotels need room setup
-                let hotelsWithRoomCounts = try await databaseService.getUserHotelsWithRoomCounts()
+                let hotelsWithRoomCounts = try await hotelService.getUserHotelsWithRoomCounts()
                 let hotelsNeedingRoomSetup = hotelsWithRoomCounts.filter { $0.needsRoomSetup }
                 
                 if !hotelsNeedingRoomSetup.isEmpty {

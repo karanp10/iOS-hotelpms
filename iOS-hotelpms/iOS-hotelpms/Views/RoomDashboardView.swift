@@ -39,7 +39,7 @@ struct RoomDashboardView: View {
                         colorForFlag: viewModel.colorForFlag,
                         roomNotes: $viewModel.roomNotes,
                         existingNotes: viewModel.existingNotes,
-                        isLoadingNotes: serviceManager.isLoadingNotes,
+                        isLoadingNotes: false, // ViewModel now manages its own loading states
                         onSaveNotes: {
                             viewModel.saveNotes(for: selectedRoom)
                         },
@@ -81,18 +81,7 @@ struct RoomDashboardView: View {
         } message: {
             Text(viewModel.errorMessage)
         }
-        // Global service manager error handling
-        .alert("Service Error", isPresented: $serviceManager.showingError) {
-            Button("Retry") {
-                viewModel.retryLastFailedOperation()
-                serviceManager.clearError()
-            }
-            Button("Cancel", role: .cancel) {
-                serviceManager.clearError()
-            }
-        } message: {
-            Text(serviceManager.lastError?.localizedDescription ?? "An unknown error occurred")
-        }
+        // ServiceManager no longer handles global errors - ViewModels handle their own errors
     }
     
     // MARK: - Panel Width Calculations

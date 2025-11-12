@@ -1,7 +1,8 @@
 import Foundation
 import SwiftUI
 
-/// Centralized service manager for consistent dependency injection across the app
+/// Lightweight dependency registry providing access to domain services across the app.
+/// Business logic orchestration now lives in ViewModels where it belongs.
 class ServiceManager: ObservableObject {
     
     // MARK: - Singleton
@@ -10,33 +11,42 @@ class ServiceManager: ObservableObject {
     // MARK: - Services
     @Published private(set) var roomService: RoomService
     @Published private(set) var notesService: NotesService
-    @Published private(set) var auditService: AuditService
-    @Published private(set) var databaseService: DatabaseService
+    @Published private(set) var roomHistoryService: RoomHistoryService
     @Published private(set) var authService: AuthService
-    @Published private(set) var historyService: HistoryService
+    
+    
+    // MARK: - New Domain Services
+    @Published private(set) var profileService: ProfileService
+    @Published private(set) var hotelService: HotelService
+    @Published private(set) var membershipService: MembershipService
+    @Published private(set) var roomBatchService: RoomBatchService
+    
+    // MARK: - Legacy Service (Deprecated)
+    @available(*, deprecated, message: "Use domain-specific services instead")
+    @Published private(set) var databaseService: DatabaseService
     
     // MARK: - Current User Context
     @Published var currentUserId: UUID? = nil // Should be set by authentication system
     @Published var currentUserRole: HotelRole? = nil
     @Published var currentHotelId: UUID? = nil
     
-    // MARK: - Global Loading States
-    @Published var isLoadingRooms = false
-    @Published var isLoadingNotes = false
-    @Published var isCreatingAuditRecord = false
-    
-    // MARK: - Error Handling
-    @Published var lastError: Error?
-    @Published var showingError = false
     
     private init() {
         // Initialize all services
         self.roomService = RoomService()
         self.notesService = NotesService()
-        self.auditService = AuditService()
-        self.databaseService = DatabaseService()
+        self.roomHistoryService = RoomHistoryService()
         self.authService = AuthService()
-        self.historyService = HistoryService()
+        
+        
+        // Initialize new domain services
+        self.profileService = ProfileService()
+        self.hotelService = HotelService()
+        self.membershipService = MembershipService()
+        self.roomBatchService = RoomBatchService()
+        
+        // Initialize deprecated service for backward compatibility
+        self.databaseService = DatabaseService()
     }
     
     // MARK: - Service Access Methods
@@ -60,12 +70,12 @@ class ServiceManager: ObservableObject {
         guard let userId = currentUserId else { return nil }
         
         do {
-            let membership = try await databaseService.getUserMembership(userId: userId, hotelId: hotelId)
+            let membership = try await membershipService.getUserMembership(userId: userId, hotelId: hotelId)
             currentUserRole = membership?.role
             currentHotelId = hotelId
             return membership?.role
         } catch {
-            handleError(error)
+            // Silently fail - ViewModels handle their own error states
             return nil
         }
     }
@@ -75,153 +85,7 @@ class ServiceManager: ObservableObject {
         return currentUserRole?.hasAdminAccess ?? false
     }
     
-    // MARK: - Error Handling
     
-    func handleError(_ error: Error) {
-        lastError = error
-        showingError = true
-    }
-    
-    func clearError() {
-        lastError = nil
-        showingError = false
-    }
-    
-    // MARK: - Convenient Service Methods with Error Handling
-    
-    @MainActor
-    func loadRooms(for hotelId: UUID) async -> [Room] {
-        isLoadingRooms = true
-        defer { isLoadingRooms = false }
-        
-        do {
-            return try await roomService.getRooms(hotelId: hotelId)
-        } catch {
-            handleError(error)
-            return []
-        }
-    }
-    
-    @MainActor
-    func loadNotes(for roomId: UUID) async -> [RoomNote] {
-        isLoadingNotes = true
-        defer { isLoadingNotes = false }
-        
-        do {
-            return try await notesService.getNotesForRoom(roomId: roomId)
-        } catch {
-            handleError(error)
-            return []
-        }
-    }
-    
-    func updateRoomOccupancy(roomId: UUID, newStatus: OccupancyStatus, previousStatus: OccupancyStatus) async -> Bool {
-        do {
-            let userId = try getCurrentUserId()
-            
-            try await roomService.updateOccupancyStatus(
-                roomId: roomId,
-                newStatus: newStatus,
-                updatedBy: userId
-            )
-            
-            // Create audit trail
-            isCreatingAuditRecord = true
-            defer { isCreatingAuditRecord = false }
-            
-            try await auditService.logOccupancyChange(
-                roomId: roomId,
-                actorId: userId,
-                from: previousStatus,
-                to: newStatus
-            )
-            
-            return true
-        } catch {
-            handleError(error)
-            return false
-        }
-    }
-    
-    func updateRoomCleaning(roomId: UUID, newStatus: CleaningStatus, previousStatus: CleaningStatus) async -> Bool {
-        do {
-            let userId = try getCurrentUserId()
-            
-            try await roomService.updateCleaningStatus(
-                roomId: roomId,
-                newStatus: newStatus,
-                updatedBy: userId
-            )
-            
-            // Create audit trail
-            isCreatingAuditRecord = true
-            defer { isCreatingAuditRecord = false }
-            
-            try await auditService.logCleaningChange(
-                roomId: roomId,
-                actorId: userId,
-                from: previousStatus,
-                to: newStatus
-            )
-            
-            return true
-        } catch {
-            handleError(error)
-            return false
-        }
-    }
-    
-    func toggleRoomFlag(roomId: UUID, flag: RoomFlag, isRemoving: Bool) async -> Bool {
-        do {
-            let userId = try getCurrentUserId()
-            
-            try await roomService.toggleFlag(
-                roomId: roomId,
-                flag: flag,
-                updatedBy: userId
-            )
-            
-            // Create audit trail
-            isCreatingAuditRecord = true
-            defer { isCreatingAuditRecord = false }
-            
-            if isRemoving {
-                try await auditService.logFlagRemoved(
-                    roomId: roomId,
-                    actorId: userId,
-                    flag: flag
-                )
-            } else {
-                try await auditService.logFlagAdded(
-                    roomId: roomId,
-                    actorId: userId,
-                    flag: flag
-                )
-            }
-            
-            return true
-        } catch {
-            handleError(error)
-            return false
-        }
-    }
-    
-    func saveNote(roomId: UUID, body: String) async -> Bool {
-        do {
-            let userId = try getCurrentUserId()
-            
-            try await notesService.createNote(
-                roomId: roomId,
-                authorId: userId,
-                body: body
-            )
-            
-            return true
-        } catch {
-            handleError(error)
-            return false
-        }
-    }
 }
 
 // MARK: - Service Errors

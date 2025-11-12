@@ -1,6 +1,8 @@
 import Foundation
 import Supabase
 
+/// Service responsible for note CRUD operations.
+/// Audit logging is handled separately by RoomHistoryService in ViewModels.
 class NotesService {
     
     private let supabaseClient: SupabaseClient
@@ -13,7 +15,7 @@ class NotesService {
     
     func createNote(roomId: UUID, authorId: UUID, body: String) async throws {
         guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw DatabaseError.networkError("Note body cannot be empty")
+            throw NotesServiceError.emptyNoteBody
         }
         
         let noteRequest = CreateNoteRequest(
@@ -27,24 +29,8 @@ class NotesService {
                 .from("room_notes")
                 .insert(noteRequest)
                 .execute()
-            
-            // Add room history entry
-            let historyRequest = RoomHistoryRequest(
-                roomId: roomId,
-                changedBy: authorId,
-                changeType: "notes",
-                oldValue: nil,
-                newValue: body.trimmingCharacters(in: .whitespacesAndNewlines),
-                note: "Note added"
-            )
-            
-            let _ = try await supabaseClient
-                .from("room_history")
-                .insert(historyRequest)
-                .execute()
-                
         } catch {
-            throw DatabaseError.networkError("Failed to create note: \(error.localizedDescription)")
+            throw NotesServiceError.networkError("Failed to create note: \(error.localizedDescription)")
         }
     }
     
@@ -63,7 +49,7 @@ class NotesService {
             
             return response
         } catch {
-            throw DatabaseError.networkError("Failed to get notes: \(error.localizedDescription)")
+            throw NotesServiceError.networkError("Failed to get notes: \(error.localizedDescription)")
         }
     }
     
@@ -79,7 +65,7 @@ class NotesService {
             
             return response
         } catch {
-            throw DatabaseError.networkError("Failed to get all notes: \(error.localizedDescription)")
+            throw NotesServiceError.networkError("Failed to get all notes: \(error.localizedDescription)")
         }
     }
     
@@ -100,18 +86,18 @@ class NotesService {
             
             return response
         } catch {
-            throw DatabaseError.networkError("Failed to get recent notes: \(error.localizedDescription)")
+            throw NotesServiceError.networkError("Failed to get recent notes: \(error.localizedDescription)")
         }
     }
     
     // MARK: - Note Updates
     
-    func updateNote(noteId: UUID, body: String, changedBy: UUID) async throws {
+    func updateNote(noteId: UUID, body: String) async throws -> RoomNote {
         guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw DatabaseError.networkError("Note body cannot be empty")
+            throw NotesServiceError.emptyNoteBody
         }
         
-        // First get the old note to track history
+        // Get the existing note for return value
         let oldNoteResponse: [RoomNote] = try await supabaseClient
             .from("room_notes")
             .select()
@@ -120,7 +106,7 @@ class NotesService {
             .value
         
         guard let oldNote = oldNoteResponse.first else {
-            throw DatabaseError.networkError("Note not found")
+            throw NotesServiceError.noteNotFound
         }
         
         let updateRequest = UpdateNoteRequest(
@@ -134,30 +120,24 @@ class NotesService {
                 .eq("id", value: noteId)
                 .execute()
             
-            // Add room history entry
-            let historyRequest = RoomHistoryRequest(
+            // Return updated note for audit logging by caller
+            return RoomNote(
+                id: oldNote.id,
                 roomId: oldNote.roomId,
-                changedBy: changedBy,
-                changeType: "notes",
-                oldValue: oldNote.note,
-                newValue: body.trimmingCharacters(in: .whitespacesAndNewlines),
-                note: "Note updated"
+                authorId: oldNote.authorId,
+                note: body.trimmingCharacters(in: .whitespacesAndNewlines),
+                createdAt: oldNote.createdAt,
+                deletedAt: oldNote.deletedAt
             )
-            
-            let _ = try await supabaseClient
-                .from("room_history")
-                .insert(historyRequest)
-                .execute()
-                
         } catch {
-            throw DatabaseError.networkError("Failed to update note: \(error.localizedDescription)")
+            throw NotesServiceError.networkError("Failed to update note: \(error.localizedDescription)")
         }
     }
     
     // MARK: - Note Deletion
     
-    func deleteNote(noteId: UUID, changedBy: UUID) async throws {
-        // First get the note to track history
+    func deleteNote(noteId: UUID) async throws -> RoomNote {
+        // Get the note before deletion for audit logging by caller
         let noteResponse: [RoomNote] = try await supabaseClient
             .from("room_notes")
             .select()
@@ -166,7 +146,7 @@ class NotesService {
             .value
         
         guard let note = noteResponse.first else {
-            throw DatabaseError.networkError("Note not found")
+            throw NotesServiceError.noteNotFound
         }
         
         do {
@@ -176,23 +156,10 @@ class NotesService {
                 .eq("id", value: noteId)
                 .execute()
             
-            // Add room history entry
-            let historyRequest = RoomHistoryRequest(
-                roomId: note.roomId,
-                changedBy: changedBy,
-                changeType: "notes",
-                oldValue: note.note,
-                newValue: nil,
-                note: "Note deleted"
-            )
-            
-            let _ = try await supabaseClient
-                .from("room_history")
-                .insert(historyRequest)
-                .execute()
-                
+            // Return deleted note for audit logging by caller
+            return note
         } catch {
-            throw DatabaseError.networkError("Failed to delete note: \(error.localizedDescription)")
+            throw NotesServiceError.networkError("Failed to delete note: \(error.localizedDescription)")
         }
     }
     
@@ -225,100 +192,7 @@ class NotesService {
                 return response
             }
         } catch {
-            throw DatabaseError.networkError("Failed to search notes: \(error.localizedDescription)")
+            throw NotesServiceError.networkError("Failed to search notes: \(error.localizedDescription)")
         }
-    }
-}
-
-// MARK: - Supporting Types
-
-struct CreateNoteRequest: Codable {
-    let roomId: UUID
-    let authorId: UUID
-    let note: String
-    let createdAt: Date
-    
-    enum CodingKeys: String, CodingKey {
-        case roomId = "room_id"
-        case authorId = "author_id"
-        case note
-        case createdAt = "created_at"
-    }
-    
-    init(roomId: UUID, authorId: UUID, note: String) {
-        self.roomId = roomId
-        self.authorId = authorId
-        self.note = note
-        self.createdAt = Date()
-    }
-}
-
-struct UpdateNoteRequest: Codable {
-    let note: String
-    
-    enum CodingKeys: String, CodingKey {
-        case note
-    }
-}
-
-struct RoomHistoryRequest: Codable {
-    let roomId: UUID
-    let changedBy: UUID
-    let changeType: String
-    let oldValue: String?
-    let newValue: String?
-    let note: String?
-    let createdAt: Date
-    
-    enum CodingKeys: String, CodingKey {
-        case roomId = "room_id"
-        case changedBy = "changed_by"
-        case changeType = "change_type"
-        case oldValue = "old_value"
-        case newValue = "new_value"
-        case note
-        case createdAt = "created_at"
-    }
-    
-    init(roomId: UUID, changedBy: UUID, changeType: String, oldValue: String?, newValue: String?, note: String?) {
-        self.roomId = roomId
-        self.changedBy = changedBy
-        self.changeType = changeType
-        self.oldValue = oldValue
-        self.newValue = newValue
-        self.note = note
-        self.createdAt = Date()
-    }
-}
-
-struct RoomNote: Codable, Identifiable {
-    let id: UUID
-    let roomId: UUID
-    let authorId: UUID?
-    let note: String
-    let createdAt: Date?
-    let deletedAt: Date?
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case roomId = "room_id"
-        case authorId = "author_id" 
-        case note
-        case createdAt = "created_at"
-        case deletedAt = "deleted_at"
-    }
-    
-    var isRecent: Bool {
-        guard let createdAt = createdAt else { return false }
-        let twoDaysAgo = Calendar.current.date(byAdding: .hour, value: -48, to: Date()) ?? Date()
-        return createdAt > twoDaysAgo
-    }
-    
-    var preview: String {
-        note.count > 50 ? String(note.prefix(47)) + "..." : note
-    }
-    
-    var body: String {
-        return note // For backward compatibility with UI code
     }
 }

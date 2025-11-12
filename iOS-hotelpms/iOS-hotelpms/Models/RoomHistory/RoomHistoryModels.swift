@@ -1,5 +1,6 @@
 import Foundation
-import Supabase
+
+// MARK: - Room History Models
 
 struct RoomHistoryEntry: Codable, Identifiable {
     let id: UUID
@@ -81,73 +82,64 @@ struct RoomHistoryEntry: Codable, Identifiable {
     }
 }
 
-class HistoryService: ObservableObject {
-    private let supabase = SupabaseManager.shared.client
+struct RoomHistoryRequest: Codable {
+    let roomId: UUID
+    let changedBy: UUID
+    let changeType: String
+    let oldValue: String?
+    let newValue: String?
+    let note: String?
+    let createdAt: Date
     
-    enum HistoryError: LocalizedError {
-        case networkError(String)
-        case userNotAuthenticated
-        
-        var errorDescription: String? {
-            switch self {
-            case .networkError(let message):
-                return "Network error: \(message)"
-            case .userNotAuthenticated:
-                return "User must be authenticated"
-            }
-        }
+    enum CodingKeys: String, CodingKey {
+        case roomId = "room_id"
+        case changedBy = "changed_by"
+        case changeType = "change_type"
+        case oldValue = "old_value"
+        case newValue = "new_value"
+        case note
+        case createdAt = "created_at"
     }
     
-    /// Fetch recent room history entries (simplified version)
-    func getRecentHistory(for hotelId: UUID, limit: Int = 50) async throws -> [RoomHistoryEntry] {
-        do {
-            let response: [RoomHistoryEntry] = try await supabase
-                .from("room_history")
-                .select()
-                .order("created_at", ascending: false)
-                .limit(limit)
-                .execute()
-                .value
-            
-            return response
-        } catch {
-            throw HistoryError.networkError(error.localizedDescription)
-        }
+    init(roomId: UUID, changedBy: UUID, changeType: String, oldValue: String?, newValue: String?, note: String?) {
+        self.roomId = roomId
+        self.changedBy = changedBy
+        self.changeType = changeType
+        self.oldValue = oldValue
+        self.newValue = newValue
+        self.note = note
+        self.createdAt = Date()
+    }
+}
+
+struct RoomNote: Codable, Identifiable {
+    let id: UUID
+    let roomId: UUID
+    let authorId: UUID?
+    let note: String
+    let createdAt: Date?
+    let deletedAt: Date?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case roomId = "room_id"
+        case authorId = "author_id" 
+        case note
+        case createdAt = "created_at"
+        case deletedAt = "deleted_at"
     }
     
-    /// Fetch history for a specific room
-    func getHistoryForRoom(_ roomId: UUID, limit: Int = 20) async throws -> [RoomHistoryEntry] {
-        do {
-            let response: [RoomHistoryEntry] = try await supabase
-                .from("room_history")
-                .select()
-                .eq("room_id", value: roomId.uuidString)
-                .order("created_at", ascending: false)
-                .limit(limit)
-                .execute()
-                .value
-            
-            return response
-        } catch {
-            throw HistoryError.networkError(error.localizedDescription)
-        }
+    var isRecent: Bool {
+        guard let createdAt = createdAt else { return false }
+        let twoDaysAgo = Calendar.current.date(byAdding: .hour, value: -48, to: Date()) ?? Date()
+        return createdAt > twoDaysAgo
     }
     
-    /// Filter history by change type
-    func getHistoryByType(for hotelId: UUID, changeType: String, limit: Int = 30) async throws -> [RoomHistoryEntry] {
-        do {
-            let response: [RoomHistoryEntry] = try await supabase
-                .from("room_history")
-                .select()
-                .eq("change_type", value: changeType)
-                .order("created_at", ascending: false)
-                .limit(limit)
-                .execute()
-                .value
-            
-            return response
-        } catch {
-            throw HistoryError.networkError(error.localizedDescription)
-        }
+    var preview: String {
+        note.count > 50 ? String(note.prefix(47)) + "..." : note
+    }
+    
+    var body: String {
+        return note // For backward compatibility with UI code
     }
 }

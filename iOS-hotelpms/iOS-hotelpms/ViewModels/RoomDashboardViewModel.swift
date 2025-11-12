@@ -89,12 +89,12 @@ class RoomDashboardViewModel: ObservableObject {
         
         do {
             // Load hotel info, rooms, and recent notes in parallel
-            async let hotelTask = serviceManager.databaseService.getHotel(id: hotelId)
-            async let roomsTask = serviceManager.loadRooms(for: hotelId)
+            async let hotelTask = serviceManager.hotelService.getHotel(id: hotelId)
+            async let roomsTask = serviceManager.roomService.getRooms(hotelId: hotelId)
             async let notesTask = serviceManager.notesService.getRecentNotesForHotel(hotelId: hotelId)
             
             hotel = try await hotelTask
-            rooms = await roomsTask
+            rooms = try await roomsTask
             recentNotes = try await notesTask
         } catch {
             errorMessage = "Failed to load dashboard: \(error.localizedDescription)"
@@ -175,13 +175,26 @@ class RoomDashboardViewModel: ObservableObject {
         
         // Persist to database asynchronously
         Task {
-            let success = await serviceManager.updateRoomOccupancy(
-                roomId: room.id,
-                newStatus: newStatus,
-                previousStatus: previousStatus
-            )
-            
-            if !success {
+            do {
+                guard let userId = serviceManager.currentUserId else {
+                    throw ServiceError.userNotAuthenticated
+                }
+                
+                // Update room status
+                try await serviceManager.roomService.updateOccupancyStatus(
+                    roomId: room.id,
+                    newStatus: newStatus,
+                    updatedBy: userId
+                )
+                
+                // Create audit trail
+                try await serviceManager.roomHistoryService.logOccupancyChange(
+                    roomId: room.id,
+                    actorId: userId,
+                    from: previousStatus,
+                    to: newStatus
+                )
+            } catch {
                 // Revert optimistic update on error
                 if let index = rooms.firstIndex(where: { $0.id == room.id }) {
                     rooms[index] = Room(
@@ -198,7 +211,7 @@ class RoomDashboardViewModel: ObservableObject {
                     )
                 }
                 
-                errorMessage = "Failed to update room: \(serviceManager.lastError?.localizedDescription ?? "Unknown error")"
+                errorMessage = "Failed to update room: \(error.localizedDescription)"
                 showingError = true
             }
         }
@@ -239,13 +252,26 @@ class RoomDashboardViewModel: ObservableObject {
         
         // Persist to database asynchronously
         Task {
-            let success = await serviceManager.updateRoomCleaning(
-                roomId: room.id,
-                newStatus: newStatus,
-                previousStatus: previousStatus
-            )
-            
-            if !success {
+            do {
+                guard let userId = serviceManager.currentUserId else {
+                    throw ServiceError.userNotAuthenticated
+                }
+                
+                // Update cleaning status
+                try await serviceManager.roomService.updateCleaningStatus(
+                    roomId: room.id,
+                    newStatus: newStatus,
+                    updatedBy: userId
+                )
+                
+                // Create audit trail
+                try await serviceManager.roomHistoryService.logCleaningChange(
+                    roomId: room.id,
+                    actorId: userId,
+                    from: previousStatus,
+                    to: newStatus
+                )
+            } catch {
                 // Revert optimistic update on error
                 if let index = rooms.firstIndex(where: { $0.id == room.id }) {
                     rooms[index] = Room(
@@ -262,7 +288,7 @@ class RoomDashboardViewModel: ObservableObject {
                     )
                 }
                 
-                errorMessage = "Failed to update cleaning status: \(serviceManager.lastError?.localizedDescription ?? "Unknown error")"
+                errorMessage = "Failed to update cleaning status: \(error.localizedDescription)"
                 showingError = true
             }
         }
@@ -312,13 +338,33 @@ class RoomDashboardViewModel: ObservableObject {
         
         // Persist to database asynchronously
         Task {
-            let success = await serviceManager.toggleRoomFlag(
-                roomId: room.id,
-                flag: flag,
-                isRemoving: isRemoving
-            )
-            
-            if !success {
+            do {
+                guard let userId = serviceManager.currentUserId else {
+                    throw ServiceError.userNotAuthenticated
+                }
+                
+                // Toggle room flag
+                try await serviceManager.roomService.toggleFlag(
+                    roomId: room.id,
+                    flag: flag,
+                    updatedBy: userId
+                )
+                
+                // Create audit trail
+                if isRemoving {
+                    try await serviceManager.roomHistoryService.logFlagRemoved(
+                        roomId: room.id,
+                        actorId: userId,
+                        flag: flag
+                    )
+                } else {
+                    try await serviceManager.roomHistoryService.logFlagAdded(
+                        roomId: room.id,
+                        actorId: userId,
+                        flag: flag
+                    )
+                }
+            } catch {
                 // Revert optimistic update on error
                 if let index = rooms.firstIndex(where: { $0.id == room.id }) {
                     rooms[index] = Room(
@@ -335,7 +381,7 @@ class RoomDashboardViewModel: ObservableObject {
                     )
                 }
                 
-                errorMessage = "Failed to toggle flag: \(serviceManager.lastError?.localizedDescription ?? "Unknown error")"
+                errorMessage = "Failed to toggle flag: \(error.localizedDescription)"
                 showingError = true
             }
         }
@@ -419,8 +465,14 @@ class RoomDashboardViewModel: ObservableObject {
     // MARK: - Notes Management
     func loadNotesForRoom(_ room: Room) {
         Task {
-            let notes = await serviceManager.loadNotes(for: room.id)
-            existingNotes = notes
+            do {
+                let notes = try await serviceManager.notesService.getNotesForRoom(roomId: room.id)
+                existingNotes = notes
+            } catch {
+                // Silently fail for notes loading - don't show error to user
+                print("Failed to load notes for room: \(error.localizedDescription)")
+                existingNotes = []
+            }
         }
     }
     
@@ -432,19 +484,34 @@ class RoomDashboardViewModel: ObservableObject {
         }
         
         Task {
-            let success = await serviceManager.saveNote(roomId: room.id, body: noteText)
-            
-            if success {
+            do {
+                guard let userId = serviceManager.currentUserId else {
+                    throw ServiceError.userNotAuthenticated
+                }
+                
+                // Save note through notes service (audit logging handled separately)
+                try await serviceManager.notesService.createNote(
+                    roomId: room.id,
+                    authorId: userId,
+                    body: noteText
+                )
+                
+                // Log the note creation for audit trail
+                try await serviceManager.roomHistoryService.logNoteAdded(
+                    roomId: room.id,
+                    actorId: userId,
+                    noteText: noteText
+                )
+                
                 toastMessage = "Notes saved for Room \(room.displayNumber) 📝"
                 showToast()
                 roomNotes = "Add notes about this room..."
                 loadNotesForRoom(room)
-            } else {
-                errorMessage = "Failed to save notes: \(serviceManager.lastError?.localizedDescription ?? "Unknown error")"
+                await reloadRecentNotes()
+            } catch {
+                errorMessage = "Failed to save notes: \(error.localizedDescription)"
                 showingError = true
             }
-            
-            await reloadRecentNotes()
         }
     }
     
