@@ -6,6 +6,8 @@ struct RoomGridView: View {
     let selectedRoomId: UUID?
     let selectedRoom: Room?
     let recentNotes: [RoomNote]
+    let scrollTargetId: UUID?
+    let onScrollConsumed: () -> Void
     
     let onRoomTap: (Room) -> Void
     let onOccupancyTap: (Room, OccupancyStatus) -> Void
@@ -20,51 +22,78 @@ struct RoomGridView: View {
     ]
     
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 24) {
-                ForEach(availableFloors.filter { roomsByFloor[$0] != nil }, id: \.self) { floor in
-                    VStack(alignment: .leading, spacing: 16) {
-                        // Floor Header
-                        HStack {
-                            Text("Floor \(floor)")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.primary)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 24) {
+                    ForEach(availableFloors.filter { roomsByFloor[$0] != nil }, id: \.self) { floor in
+                        VStack(alignment: .leading, spacing: 16) {
+                            // Floor Header
+                            HStack {
+                                Text("Floor \(floor)")
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.primary)
+                                
+                                Spacer()
+                                
+                                Text("\(roomsByFloor[floor]?.count ?? 0) rooms")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
                             
-                            Spacer()
-                            
-                            Text("\(roomsByFloor[floor]?.count ?? 0) rooms")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        // Rooms Grid for this floor
-                        LazyVGrid(columns: columns, spacing: 16) {
-                            ForEach(roomsByFloor[floor] ?? []) { room in
-                                RoomCard(
-                                    room: room,
-                                    onTap: {
-                                        onRoomTap(room)
-                                    },
-                                    onOccupancyTap: { newStatus in
-                                        onOccupancyTap(room, newStatus)
-                                    },
-                                    onCleaningTap: { newStatus in
-                                        onCleaningTap(room, newStatus)
-                                    },
-                                    isSelected: selectedRoomId == room.id,
-                                    isCompressed: selectedRoom != nil,
-                                    recentNotes: recentNotes,
-                                    nextOccupancyStatus: nextOccupancyStatus,
-                                    nextCleaningStatus: nextCleaningStatus
-                                )
+                            // Rooms Grid for this floor
+                            LazyVGrid(columns: columns, spacing: 16) {
+                                ForEach(roomsByFloor[floor] ?? []) { room in
+                                    RoomCard(
+                                        room: room,
+                                        onTap: {
+                                            onRoomTap(room)
+                                        },
+                                        onOccupancyTap: { newStatus in
+                                            onOccupancyTap(room, newStatus)
+                                        },
+                                        onCleaningTap: { newStatus in
+                                            onCleaningTap(room, newStatus)
+                                        },
+                                        isSelected: selectedRoomId == room.id,
+                                        isCompressed: selectedRoom != nil,
+                                        recentNotes: recentNotes,
+                                        nextOccupancyStatus: nextOccupancyStatus,
+                                        nextCleaningStatus: nextCleaningStatus
+                                    )
+                                    .id(room.id)
+                                }
                             }
                         }
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
+            .onChange(of: scrollTargetId) { id in
+                guard let id else { return }
+                scrollToRoom(id, proxy: proxy)
+            }
+            .onAppear {
+                if let id = scrollTargetId {
+                    scrollToRoom(id, proxy: proxy, animated: false)
+                }
+            }
+        }
+    }
+    
+    private func scrollToRoom(_ id: UUID, proxy: ScrollViewProxy, animated: Bool = true) {
+        let action = {
+            proxy.scrollTo(id, anchor: .center)
+            onScrollConsumed()
+        }
+        
+        if animated {
+            withAnimation(.easeInOut(duration: 0.4)) {
+                action()
+            }
+        } else {
+            action()
         }
     }
 }
@@ -81,6 +110,8 @@ struct RoomGridView: View {
         selectedRoomId: nil,
         selectedRoom: nil,
         recentNotes: [],
+        scrollTargetId: nil,
+        onScrollConsumed: {},
         onRoomTap: { _ in },
         onOccupancyTap: { _, _ in },
         onCleaningTap: { _, _ in },

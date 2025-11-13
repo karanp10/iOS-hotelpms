@@ -31,10 +31,12 @@ class RoomDashboardViewModel: ObservableObject {
     // MARK: - Notes State
     @Published var roomNotes: String = ""
     @Published var existingNotes: [RoomNote] = []
+    @Published var scrollTargetId: UUID?
     
     // MARK: - Dependencies
     private let hotelId: UUID
     private let serviceManager: ServiceManager
+    private var pendingRoomSelection: UUID?
     
     // MARK: - Computed Properties
     var selectedRoom: Room? {
@@ -77,9 +79,14 @@ class RoomDashboardViewModel: ObservableObject {
     }
     
     // MARK: - Initialization
-    init(hotelId: UUID, serviceManager: ServiceManager = ServiceManager.shared) {
+    init(
+        hotelId: UUID,
+        initialRoomId: UUID? = nil,
+        serviceManager: ServiceManager = ServiceManager.shared
+    ) {
         self.hotelId = hotelId
         self.serviceManager = serviceManager
+        self.pendingRoomSelection = initialRoomId
         self.roomNotes = "Add notes about this room..."
     }
     
@@ -96,6 +103,7 @@ class RoomDashboardViewModel: ObservableObject {
             hotel = try await hotelTask
             rooms = try await roomsTask
             recentNotes = try await notesTask
+            applyPendingRoomSelection()
         } catch {
             errorMessage = "Failed to load dashboard: \(error.localizedDescription)"
             showingError = true
@@ -131,15 +139,13 @@ class RoomDashboardViewModel: ObservableObject {
             }
         } else {
             // New room selected, update content smoothly
-            withAnimation(.easeInOut(duration: 0.2)) {
-                selectedRoomId = room.id
-                showingDetail = true
-                // Reset notes for new room
-                roomNotes = "Add notes about this room..."
-                // Load existing notes for this room
-                loadNotesForRoom(room)
-            }
+            openRoom(room, shouldScroll: false)
         }
+    }
+    
+    func focusOnRoom(_ roomId: UUID) {
+        pendingRoomSelection = roomId
+        applyPendingRoomSelection()
     }
     
     func closeRoomDetail() {
@@ -147,6 +153,27 @@ class RoomDashboardViewModel: ObservableObject {
             selectedRoomId = nil
             showingDetail = false
         }
+    }
+
+    private func openRoom(_ room: Room, shouldScroll: Bool) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            selectedRoomId = room.id
+            showingDetail = true
+            roomNotes = "Add notes about this room..."
+        }
+        loadNotesForRoom(room)
+        scrollTargetId = shouldScroll ? room.id : nil
+    }
+    
+    private func applyPendingRoomSelection() {
+        guard let pendingRoomSelection,
+              let room = rooms.first(where: { $0.id == pendingRoomSelection }) else { return }
+        self.pendingRoomSelection = nil
+        openRoom(room, shouldScroll: true)
+    }
+    
+    func consumeScrollTarget() {
+        scrollTargetId = nil
     }
     
     // MARK: - Room Mutations

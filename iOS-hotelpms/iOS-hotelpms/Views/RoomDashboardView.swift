@@ -1,14 +1,23 @@
 import SwiftUI
+import Combine
 
 struct RoomDashboardView: View {
     let hotelId: UUID
     @EnvironmentObject var navigationManager: NavigationManager
+    @Environment(\.dashboardCoordinator) private var dashboardCoordinator
     @StateObject private var viewModel: RoomDashboardViewModel
     @StateObject private var serviceManager = ServiceManager.shared
     
-    init(hotelId: UUID) {
+    private var roomFocusPublisher: AnyPublisher<UUID, Never> {
+        dashboardCoordinator?
+            .$requestedRoomId
+            .compactMap { $0 }
+            .eraseToAnyPublisher() ?? Empty<UUID, Never>().eraseToAnyPublisher()
+    }
+    
+    init(hotelId: UUID, initialRoomId: UUID? = nil) {
         self.hotelId = hotelId
-        self._viewModel = StateObject(wrappedValue: RoomDashboardViewModel(hotelId: hotelId))
+        self._viewModel = StateObject(wrappedValue: RoomDashboardViewModel(hotelId: hotelId, initialRoomId: initialRoomId))
     }
     
     var body: some View {
@@ -66,7 +75,12 @@ struct RoomDashboardView: View {
             ), 
             alignment: .bottom
         )
-        .navigationBarHidden(true)
+        .navigationTitle(viewModel.hotel?.name ?? "Rooms")
+        .navigationBarTitleDisplayMode(.inline)
+        .onReceive(roomFocusPublisher) { roomId in
+            viewModel.focusOnRoom(roomId)
+            dashboardCoordinator?.clearRoomRequest()
+        }
         .task {
             // TODO: Replace with proper user session management
             // For now, set the current user ID for development/testing
@@ -158,6 +172,8 @@ struct RoomDashboardView: View {
                     selectedRoomId: viewModel.selectedRoomId,
                     selectedRoom: viewModel.selectedRoom,
                     recentNotes: viewModel.recentNotes,
+                    scrollTargetId: viewModel.scrollTargetId,
+                    onScrollConsumed: viewModel.consumeScrollTarget,
                     onRoomTap: viewModel.selectRoom,
                     onOccupancyTap: viewModel.updateRoomOccupancy,
                     onCleaningTap: viewModel.updateRoomCleaning,
@@ -166,8 +182,6 @@ struct RoomDashboardView: View {
                 )
             }
         }
-        .navigationTitle("")
-        .navigationBarHidden(true)
     }
 }
 

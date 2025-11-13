@@ -3,22 +3,29 @@ import SwiftUI
 struct AdminTabView: View {
     let hotelId: UUID
     @EnvironmentObject var navigationManager: NavigationManager
+    @StateObject private var dashboardCoordinator = AdminDashboardCoordinator()
+    
+    private var statusTabLabel: some View {
+        Label("Status", systemImage: "bed.double.fill")
+    }
+    
+    private var updatesTabLabel: some View {
+        Label("Recent Updates", systemImage: "clock.arrow.circlepath")
+    }
     
     var body: some View {
-        TabView {
+        TabView(selection: $dashboardCoordinator.selectedTab) {
             // Status Tab
             RoomDashboardView(hotelId: hotelId)
-                .tabItem {
-                    Image(systemName: "bed.double.fill")
-                    Text("Status")
-                }
+                .environment(\.dashboardCoordinator, dashboardCoordinator)
+                .tabItem { statusTabLabel }
+                .tag(AdminTab.status)
             
             // Recent Updates Tab
             RecentlyUpdatedView(hotelId: hotelId)
-                .tabItem {
-                    Image(systemName: "clock.arrow.circlepath")
-                    Text("Recent Updates")
-                }
+                .environment(\.dashboardCoordinator, dashboardCoordinator)
+                .tabItem { updatesTabLabel }
+                .tag(AdminTab.recentUpdates)
         }
         .navigationBarHidden(true)
     }

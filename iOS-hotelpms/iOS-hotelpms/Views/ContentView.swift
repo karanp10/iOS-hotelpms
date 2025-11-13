@@ -16,7 +16,7 @@ enum NavigationDestination: Hashable {
     case employeeJoin
     case hotelSelection
     case roomSetup(hotelId: UUID)
-    case roomDashboard(hotelId: UUID)
+    case roomDashboard(hotelId: UUID, roomId: UUID? = nil)
     case adminDashboard(hotelId: UUID)
 }
 
@@ -45,8 +45,8 @@ struct ContentView: View {
                         HotelSelectionView()
                     case .roomSetup(let hotelId):
                         RoomSetupView(hotelId: hotelId)
-                    case .roomDashboard(let hotelId):
-                        RoomDashboardView(hotelId: hotelId)
+                    case .roomDashboard(let hotelId, let roomId):
+                        RoomDashboardView(hotelId: hotelId, initialRoomId: roomId)
                     case .adminDashboard(let hotelId):
                         AdminTabView(hotelId: hotelId)
                     }

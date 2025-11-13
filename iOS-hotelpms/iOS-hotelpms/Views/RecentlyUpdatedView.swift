@@ -3,6 +3,7 @@ import SwiftUI
 struct RecentlyUpdatedView: View {
     let hotelId: UUID
     @EnvironmentObject var navigationManager: NavigationManager
+    @Environment(\.dashboardCoordinator) private var dashboardCoordinator
     @StateObject private var viewModel: RecentlyUpdatedViewModel
     
     init(hotelId: UUID) {
@@ -12,22 +13,29 @@ struct RecentlyUpdatedView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
             RecentUpdatesHeader(viewModel: viewModel)
             
-            // Content
-            if viewModel.isLoading {
-                Spacer()
-                ProgressView("Loading recent updates...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                Spacer()
-            } else if viewModel.filteredEntries.isEmpty {
-                emptyStateView
-            } else {
-                HistorySectionList(viewModel: viewModel)
+            Group {
+                if viewModel.isLoading {
+                    RecentUpdatesSkeletonView()
+                } else if viewModel.filteredEntries.isEmpty {
+                    emptyStateView
+                } else {
+                    HistorySectionList(
+                        viewModel: viewModel,
+                        onEntryTap: { entry in
+                            viewModel.toggleExpanded(entry: entry)
+                        },
+                        onGoToRoom: { entry in
+                            goToRoom(for: entry)
+                        }
+                    )
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .navigationBarHidden(true)
+        .navigationTitle("Recent Updates")
+        .navigationBarTitleDisplayMode(.inline)
         .task {
             await viewModel.loadHistory()
         }
@@ -48,15 +56,15 @@ struct RecentlyUpdatedView: View {
         VStack(spacing: 16) {
             Spacer()
             
-            Image(systemName: "clock.arrow.circlepath")
+            Image(systemName: viewModel.isSearchActive ? "magnifyingglass" : "sun.max")
                 .font(.system(size: 60))
                 .foregroundColor(.secondary)
             
-            Text(viewModel.searchText.isEmpty ? "No recent updates" : "No updates match your search")
+            Text(viewModel.isSearchActive ? "No updates match your search." : "No updates yet today. All quiet 🧼.")
                 .font(.title2)
                 .foregroundColor(.secondary)
             
-            if !viewModel.searchText.isEmpty {
+            if viewModel.isSearchActive {
                 Button("Clear Search") {
                     viewModel.clearSearch()
                 }
@@ -64,6 +72,15 @@ struct RecentlyUpdatedView: View {
             }
             
             Spacer()
+        }
+    }
+    
+    private func goToRoom(for entry: RoomHistoryEntry) {
+        if let coordinator = dashboardCoordinator {
+            coordinator.selectedTab = .status
+            coordinator.focusRoom(entry.roomId)
+        } else {
+            navigationManager.navigate(to: .roomDashboard(hotelId: hotelId, roomId: entry.roomId))
         }
     }
 }

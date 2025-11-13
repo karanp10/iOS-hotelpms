@@ -49,6 +49,17 @@ struct RecentUpdatesHeader: View {
                         .foregroundColor(.secondary)
                     
                     TextField("Search updates...", text: $viewModel.searchText)
+                        .textInputAutocapitalization(.never)
+                        .disableAutocorrection(true)
+                    
+                    if !viewModel.searchText.isEmpty {
+                        Button {
+                            viewModel.clearSearch()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -58,9 +69,30 @@ struct RecentUpdatesHeader: View {
                 
                 Spacer()
                 
-                // Filter Menu
-                HistoryFilterMenu(selectedFilter: $viewModel.selectedFilter)
+                Button {
+                    viewModel.toggleSortOrder()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.up.arrow.down.circle")
+                        Text(viewModel.sortOrder == .newestFirst ? "Newest" : "Oldest")
+                        Text("↕")
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.primary)
             }
+            
+            Picker("Filter", selection: $viewModel.selectedFilter) {
+                ForEach(HistoryFilter.allCases, id: \.self) { filter in
+                    Text(filter.displayName)
+                        .tag(filter)
+                }
+            }
+            .pickerStyle(.segmented)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
