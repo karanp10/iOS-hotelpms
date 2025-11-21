@@ -95,6 +95,17 @@ struct RoomGridView: View {
         } else {
             action()
         }
+        
+        // Retry mechanism: if the room isn't visible after initial scroll, retry once
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // Only retry if we haven't consumed the scroll target yet (indicates scroll may have failed)
+            if scrollTargetId == id {
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    proxy.scrollTo(id, anchor: .center)
+                    onScrollConsumed()
+                }
+            }
+        }
     }
 }
 

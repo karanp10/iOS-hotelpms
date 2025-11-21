@@ -169,7 +169,17 @@ class RoomDashboardViewModel: ObservableObject {
         guard let pendingRoomSelection,
               let room = rooms.first(where: { $0.id == pendingRoomSelection }) else { return }
         self.pendingRoomSelection = nil
-        openRoom(room, shouldScroll: true)
+        
+        // Clear any active filters to ensure the target room is visible
+        clearFilters()
+        
+        // Open room immediately but delay scroll to allow LazyVGrid to render
+        openRoom(room, shouldScroll: false)
+        
+        // Delay scroll target to ensure LazyVGrid has materialized the room card
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            self.scrollTargetId = room.id
+        }
     }
     
     func consumeScrollTarget() {
