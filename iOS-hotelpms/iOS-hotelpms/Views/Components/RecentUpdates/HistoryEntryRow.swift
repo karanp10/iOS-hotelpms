@@ -73,27 +73,27 @@ private struct InlineRoomSnapshot: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
-                StatusChip(
+                HistoryStatusChip(
                     icon: "house.fill",
                     label: room.occupancyStatus.displayName,
                     tint: .blue
                 )
                 
-                StatusChip(
+                HistoryStatusChip(
                     icon: "broom",
                     label: room.cleaningStatus.displayName,
                     tint: .yellow
                 )
                 
                 if room.flags.isEmpty {
-                    StatusChip(
+                    HistoryStatusChip(
                         icon: "flag.slash.fill",
                         label: "No flags",
                         tint: .gray
                     )
                 } else {
                     ForEach(room.flags, id: \.self) { flag in
-                        StatusChip(
+                        HistoryStatusChip(
                             icon: flag.systemImage,
                             label: flag.displayName,
                             tint: .red
@@ -123,7 +123,7 @@ private struct InlineRoomSnapshot: View {
     }
 }
 
-private struct StatusChip: View {
+private struct HistoryStatusChip: View {
     let icon: String
     let label: String
     let tint: Color

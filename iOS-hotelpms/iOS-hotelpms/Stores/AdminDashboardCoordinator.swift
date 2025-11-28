@@ -5,6 +5,8 @@ import Combine
 enum AdminTab: Hashable {
     case status
     case recentUpdates
+    case admin        // NEW - Admin/Manager only
+    case account      // NEW - All users
 }
 
 /// Coordinates tab selection and deep-linking between the dashboard and recent updates screens.
