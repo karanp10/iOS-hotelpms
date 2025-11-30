@@ -53,7 +53,7 @@ class RoomBatchService: ObservableObject {
                   let endRoom = Int(range.endRoom) else {
                 continue
             }
-            
+
             for roomNumber in startRoom...endRoom {
                 let floorNumber = Room.calculateFloor(from: roomNumber)
                 let room = Room(
@@ -64,7 +64,7 @@ class RoomBatchService: ObservableObject {
                     cleaningStatus: .dirty,
                     flags: []
                 )
-                roomsToCreate.append(CreateRoomRequest(room: room))
+                roomsToCreate.append(CreateRoomRequest(room: room, updatedBy: userId))
             }
         }
         

@@ -58,9 +58,9 @@ class RoomService {
     }
     
     // MARK: - Mutation Methods (Write Operations)
-    
+
     /// Create a single room
-    func createRoom(_ request: CreateRoomRequest) async throws {
+    func createRoom(_ request: CreateRoomRequest) async throws -> Room {
         return try await mutations.createRoom(request)
     }
     

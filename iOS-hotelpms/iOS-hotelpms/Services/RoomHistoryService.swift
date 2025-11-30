@@ -247,6 +247,28 @@ class RoomHistoryService {
             reason: reason ?? "Note deleted"
         )
     }
+
+    func logRoomCreation(roomId: UUID, actorId: UUID, reason: String? = nil) async throws {
+        try await createAuditRecord(
+            roomId: roomId,
+            actorId: actorId,
+            eventType: AuditEventType.created.rawValue,
+            prevValue: nil,
+            newValue: "Room created",
+            reason: reason
+        )
+    }
+
+    func logRoomDeletion(roomId: UUID, actorId: UUID, reason: String? = nil) async throws {
+        try await createAuditRecord(
+            roomId: roomId,
+            actorId: actorId,
+            eventType: AuditEventType.created.rawValue,
+            prevValue: "Room deleted",
+            newValue: nil,
+            reason: reason
+        )
+    }
 }
 
 // MARK: - Supporting Types

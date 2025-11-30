@@ -175,7 +175,9 @@ enum RoomServiceError: LocalizedError {
     case invalidRoomData
     case networkError(String)
     case updateFailed(String)
-    
+    case deleteFailed(String)
+    case userNotAuthenticated
+
     var errorDescription: String? {
         switch self {
         case .roomNotFound:
@@ -186,6 +188,10 @@ enum RoomServiceError: LocalizedError {
             return "Network error: \(message)"
         case .updateFailed(let message):
             return "Update failed: \(message)"
+        case .deleteFailed(let message):
+            return "Failed to delete room: \(message)"
+        case .userNotAuthenticated:
+            return "User not authenticated"
         }
     }
 }

@@ -13,13 +13,17 @@ class RoomMutations {
     }
     
     // MARK: - Room Creation
-    
-    func createRoom(_ request: CreateRoomRequest) async throws {
+
+    func createRoom(_ request: CreateRoomRequest) async throws -> Room {
         do {
-            let _ = try await supabaseClient
+            let room: Room = try await supabaseClient
                 .from("rooms")
                 .insert(request)
+                .select()
+                .single()
                 .execute()
+                .value
+            return room
         } catch {
             throw RoomServiceError.networkError("Failed to create room: \(error.localizedDescription)")
         }

@@ -1,88 +1,78 @@
-# Status & Recent Updates Polish ✅ COMPLETE
+• Schema takeaways
 
-Use this document to track UI refinements for the iPad dashboard. Each section is structured as "What's working" vs. "Next refinements" so we can quickly move items into the "Recently Updated" tab once shipped.
+  - join_requests.status only allows pending | accepted | rejected, while hotel_memberships.status uses pending |
+    approved | rejected. Any approval path has to translate between those enums.
+  - profiles no longer carries a hotel_id, so the current approve-join-request edge function (which writes to
+    profiles.hotel_id) can’t succeed—there’s no such column.
+  - To grant access, we must insert/update hotel_memberships rows; that’s where role and approval status live.
 
----
+  Edge function gaps
 
-## 1. Navigation Bar — Positioning & Style ✅ IMPLEMENTED
+  1. approve-join-request
+      - Updates join_requests to accepted/rejected, but never creates a hotel_memberships row, so the employee
+        still has no hotel access.
+      - Attempts to set profiles.hotel_id, which doesn’t exist per docs/DB.md, so approvals will fail.
+      - Uses open GET parameters (id, action) with a service-role key, so anyone who gets the link can approve/
+        reject.
+  2. notify-admin
+      - Fetches hotel.hotel_name, but the column is name.
+      - Sends the manager an email with links to the insecure approval function above; no employee notification
+        is ever sent.
+      - Doesn’t include the requested role, so the admin has zero context in-app unless the mobile client stores
+        it elsewhere.
 
-### ✅ What's working
-- Centered tabs (`Status` / `Recent Updates`) feel native on iPad and reinforce that both views belong to one dashboard context.
-- Keeping the page title (`Best Western`) left-aligned below the tabs preserves continuity when switching views.
-- Inline room stats (Occupied / Dirty / Flagged) are easy to scan at a glance.
+  Given that starting point, here’s a fresh implementation plan, aligned with docs/DEVELOPMENT_WORKFLOW.md.
 
-### ✅ COMPLETED - Option A — Modern iPadOS hierarchy (minimal change)
-1. ✅ Preserved existing layout but tightened hierarchy:
-   ```
-   [ Status | Recent Updates ]
-   Best Western
-   Occupancy • Cleaning • Floor filters
-   Metrics: 5 Occupied / 234 Dirty / 0 Flagged
-   ```
-2. ✅ Increased hotel name to 24pt Semibold for better anchor weight.
-3. ✅ Moved metrics onto their own line under the filters to reduce cognitive load.
+  ———
 
-**✅ COMPLETED - Shared polish**
-- ✅ Added light Material.regular blur behind the nav bar for depth.
-- ✅ Introduced subtle 1pt divider that appears once content scrolls.
+  Implementation Plan
 
----
+  1. Model the data (Workflow §2.1)
+      - Add a real JoinRequest struct under Models/ and request DTOs under Models/Requests/Onboarding/, matching
+        docs/DB.md (id, profileId, hotelId, status, createdAt). Include nested requester info for admin views.
+      - Extend HotelMembership models to reference the existing JoinRequestStatus/MembershipStatus enums so the
+        app can translate accepted ↔ approved.
+  2. Design the service surface (Workflow §2.2)
+      - Introduce a JoinRequestService (or extend MembershipService) with async APIs:
+          - createJoinRequest(hotelId: UUID, role: HotelRole) → inserts join_requests (status pending), inserts
+            a matching hotel_memberships row with status = pending, and invokes the notify-admin function (POST
+            body containing hotel name, admin email, requester info, and a signed approval token).
+          - fetchJoinRequests(hotelId:, status:) → joins profiles and returns admin-facing data.
+          - approveJoinRequest(requestId:) / rejectJoinRequest(requestId:) → updates join_requests.status to
+            accepted/rejected, toggles the related hotel_memberships.status to approved/rejected, and calls a new
+            function (or extends the existing one) to email the employee about the decision.
+      - Update ServiceManager to vend this service so onboarding/admin view models don’t touch Supabase directly.
+  3. Fix and harden the Edge functions (before wiring the app)
+      - notify-admin: select name instead of hotel_name; include the requester’s desired role; generate a one-
+        time signed token (store in join_requests or a companion table) instead of exposing raw IDs; email the
+        admin via Resend with approve/reject URLs containing that token.
+      - approve-join-request: accept a POST body with the signed token, validate it, update join_requests.status,
+        update the matching hotel_memberships.status, and call Resend to notify the employee of the outcome. Drop
+        the profiles.hotel_id update entirely. Return an HTML confirmation like today.
+      - Both functions should use env vars for any callback base URLs and handle errors with JSON/HTML responses
+        for easier debugging.
+  4. Author the view models (Workflow §2.3)
+      - EmployeeJoinViewModel: wire its requestToJoin() to the new service method, collect the desired role, and
+        expose state for “pending request exists”. On success, push a new JoinRequestPendingView.
+      - JoinRequestsViewModel: back Views/Components/Admin/JoinRequestsList.swift with real data—load pending
+        requests on appear, expose loading/error states, and call approve/reject service methods. Show toasts/
+        alerts driven by published state.
+  5. Compose the SwiftUI views (Workflow §2.4)
+      - Add a JoinRequestPendingView (under Views/Components/Onboarding/) explaining that the hotel admin has
+        been emailed and showing the selected hotel/role.
+      - Update JoinRequestsList to consume the new view model, display counts from live data, and show action
+        spinners/disable buttons while mutations run.
+      - Ensure AccountSelectionView and LoginView route users with pending requests into the pending screen
+        instead of looping back.
+  6. Wire navigation & previews (Workflow §2.5)
+      - Add a NavigationDestination.joinRequestPending(hotelName: String) case and hook it up in ContentView.
+        Provide Previews for the pending view and the admin list using mock services that mimic the schema.
+  7. Validate (Workflow §2.6)
+      - Run through the join flow end-to-end in the simulator: submit a request, verify Supabase rows, ensure the
+        admin email arrives with secure links, click approve/reject to confirm memberships are updated, and log
+        the employee back in to confirm access.
+      - Smoke-test the admin tab: pending requests load, approving updates the UI, and rejection also removes/
+        persists correctly.
 
-## 2. Recent Updates Page — Interaction & Visual Hierarchy
-
-### ✅ What’s solid
-- Date grouping (“Today”, “Oct 13, 2025”) clearly communicates recency.
-- Top-line metrics (Today / Cleaning / Flags) give instant status.
-- Small trailing icons help identify update types quickly.
-
-### ✴️ Visual polish & UX depth
-1. **Type hierarchy**
-   - Primary line: bold room + action (`Room 104 — Assigned → Occupied`).
-   - Secondary line: muted metadata (`By User • 3:16 PM`).
-2. **Icon + color coding**
-   - Occupancy change → blue home icon.
-   - Cleaning state → yellow broom.
-   - Flags → red flag.
-   - Notes → gray note icon.
-   - Reinforces category recognition at peripheral vision.
-3. **Timeline spine**
-   - Add a faint vertical line with dots per entry on the left.
-   - Reset the spine per date group so the feed reads like an activity log.
-4. **Filter & sort pills**
-   - Segmented filter: `All | Occupancy | Cleaning | Flags | Notes`.
-   - “Newest ↕” toggle for chronological vs. reverse order.
-5. **Inline room preview**
-   - Tapping an entry mutates the cell to show current Occupancy / Cleaning / Flag state plus a `Go to Room` CTA.
-6. **Highlight “Today”**
-   - Use a soft tinted background for the “Today” group instead of just “2 updates”.
-7. **State handling**
-   - Empty state copy: “No updates yet today. All quiet 🧼.”
-   - Skeleton shimmer during data fetch to telegraph loading.
-
----
-
-## Recently Updated Tab Impact ✅ ACHIEVED
-- ✅ These changes add meaningful signals without overwhelming the feed, making the tab feel more actionable for shift leads.
-- ✅ The typography + color coding immediately shows what type of work is happening, while the timeline spine and filters let users triage faster.
-- ⏳ Inline previews and tap-through affordances encourage deeper engagement so the "Recently Updated" tab becomes the starting point for shift handoff reviews, not just a passive log.
-
----
-
-## Implementation Summary
-
-### ✅ COMPLETED FEATURES
-1. **Navigation Infrastructure** - Custom AdminNavigationHeader with Option A layout
-2. **Visual Hierarchy** - Primary/secondary text styling with proper font weights
-3. **Icon + Color Coding** - Blue (occupancy), Yellow (cleaning), Red (flags), Gray (notes)
-4. **Timeline Design** - Vertical spine with colored dots, timeline connectors between entries
-5. **Filter Pills** - Modern pill-style filters with counts and selection states
-6. **Today Highlighting** - Tinted background and accent styling for current day
-7. **Loading States** - Skeleton shimmer animation during data fetch
-8. **Empty States** - Context-aware messages with clear calls to action
-9. **Material Design** - Blur backgrounds and separator lines that appear on scroll
-
-### ⏳ REMAINING (Low Priority)
-- Inline room preview on tap (expandable cells)
-- Sort direction toggle functionality
-
-The Recent Updates tab now provides a polished, production-ready experience for hotel staff to review activity and coordinate shift handoffs.
+  This plan keeps us within the architecture guide: schema-aligned models, service façade, MVVM boundaries,
+  reusable components, and proper navigation wiring before manual QA.
