@@ -20,6 +20,7 @@ class ServiceManager: ObservableObject {
     @Published private(set) var hotelService: HotelService
     @Published private(set) var membershipService: MembershipService
     @Published private(set) var roomBatchService: RoomBatchService
+    @Published private(set) var joinRequestService: JoinRequestService
     
     // MARK: - Legacy Service (Deprecated)
     @available(*, deprecated, message: "Use domain-specific services instead")
@@ -44,6 +45,7 @@ class ServiceManager: ObservableObject {
         self.hotelService = HotelService()
         self.membershipService = MembershipService()
         self.roomBatchService = RoomBatchService()
+        self.joinRequestService = JoinRequestService()
         
         // Initialize deprecated service for backward compatibility
         self.databaseService = DatabaseService()

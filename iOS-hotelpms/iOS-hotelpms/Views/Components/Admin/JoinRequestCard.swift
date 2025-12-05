@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct JoinRequestCard: View {
-    let request: JoinRequestMock
+    let request: JoinRequestWithProfile
+    let isProcessing: Bool
     let onApprove: () -> Void
     let onReject: () -> Void
     
@@ -21,10 +22,10 @@ struct JoinRequestCard: View {
                     )
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(request.name)
+                    Text(request.fullName)
                         .font(.headline)
                         .foregroundColor(.primary)
-                    
+
                     Text(request.email)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
@@ -39,28 +40,21 @@ struct JoinRequestCard: View {
                 )
             }
             
-            // Role and date info
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Requested Role")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    Text(request.role.displayName)
+            // Request date info
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Requested")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                if let createdAt = request.createdAt {
+                    Text(formatDate(createdAt))
                         .font(.subheadline)
                         .fontWeight(.medium)
-                }
-                
-                Spacer()
-                
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("Requested")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    Text(formatDate(request.requestedDate))
+                } else {
+                    Text("Unknown")
                         .font(.subheadline)
                         .fontWeight(.medium)
+                        .foregroundColor(.secondary)
                 }
             }
             
@@ -76,15 +70,22 @@ struct JoinRequestCard: View {
                     }
                     .buttonStyle(.bordered)
                     .foregroundColor(.red)
-                    
+                    .disabled(isProcessing)
+
                     Button(action: onApprove) {
                         HStack {
-                            Image(systemName: "checkmark")
+                            if isProcessing {
+                                ProgressView()
+                                    .tint(.white)
+                            } else {
+                                Image(systemName: "checkmark")
+                            }
                             Text("Approve")
                         }
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
+                    .disabled(isProcessing)
                 }
             }
         }
@@ -98,7 +99,7 @@ struct JoinRequestCard: View {
         switch status {
         case .pending:
             return .orange
-        case .approved:
+        case .accepted:
             return .green
         case .rejected:
             return .red
@@ -130,17 +131,36 @@ struct StatusChip: View {
 }
 
 #Preview {
+    let sampleProfile = Profile(
+        id: UUID(),
+        firstName: "Sarah",
+        lastName: "Johnson",
+        email: "sarah.johnson@email.com",
+        createdAt: Date()
+    )
+
+    let sampleRequest = JoinRequestWithProfile(
+        id: UUID(),
+        profileId: sampleProfile.id,
+        hotelId: UUID(),
+        status: .pending,
+        createdAt: Calendar.current.date(byAdding: .day, value: -2, to: Date()),
+        profile: sampleProfile
+    )
+
     VStack(spacing: 16) {
         JoinRequestCard(
-            request: MockData.joinRequests[0],
-            onApprove: {},
-            onReject: {}
+            request: sampleRequest,
+            isProcessing: false,
+            onApprove: { print("Approved") },
+            onReject: { print("Rejected") }
         )
-        
+
         JoinRequestCard(
-            request: MockData.joinRequests[1],
-            onApprove: {},
-            onReject: {}
+            request: sampleRequest,
+            isProcessing: true,
+            onApprove: { print("Approved") },
+            onReject: { print("Rejected") }
         )
     }
     .padding()

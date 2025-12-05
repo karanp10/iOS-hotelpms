@@ -2,35 +2,44 @@ import SwiftUI
 
 struct JoinRequestsList: View {
     let hotelId: UUID
-    @State private var isLoading = false
-    
-    // Mock data for now
-    private let mockRequests = MockData.joinRequests
-    
+    @StateObject private var viewModel: JoinRequestsViewModel
+
+    init(hotelId: UUID) {
+        self.hotelId = hotelId
+        self._viewModel = StateObject(wrappedValue: JoinRequestsViewModel(hotelId: hotelId))
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             // Header with stats
-            JoinRequestsHeader(pendingCount: mockRequests.count)
-            
-            if isLoading {
+            JoinRequestsHeader(pendingCount: viewModel.pendingCount)
+
+            if viewModel.isLoading {
                 // Loading state
                 VStack {
                     ProgressView("Loading join requests...")
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if mockRequests.isEmpty {
+            } else if viewModel.joinRequests.isEmpty {
                 // Empty state
                 JoinRequestsEmptyState()
             } else {
                 // Request list
                 ScrollView {
                     LazyVStack(spacing: 16) {
-                        ForEach(mockRequests) { request in
+                        ForEach(viewModel.joinRequests) { request in
                             JoinRequestCard(
                                 request: request,
-                                onApprove: { approveRequest(request) },
-                                onReject: { rejectRequest(request) }
+                                isProcessing: viewModel.isProcessing(request.id),
+                                onApprove: {
+                                    viewModel.startApproval(requestId: request.id)
+                                },
+                                onReject: {
+                                    Task {
+                                        await viewModel.rejectRequest(requestId: request.id)
+                                    }
+                                }
                             )
                         }
                     }
@@ -41,45 +50,68 @@ struct JoinRequestsList: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
-        .onAppear {
-            // TODO: Load real data
+        .sheet(isPresented: $viewModel.showingRolePicker) {
+            RolePickerSheet(
+                selectedRole: $viewModel.selectedRole,
+                onConfirm: {
+                    Task {
+                        await viewModel.confirmApproval()
+                    }
+                },
+                onCancel: {
+                    viewModel.cancelApproval()
+                }
+            )
+            .presentationDetents([.medium])
         }
-    }
-    
-    private func approveRequest(_ request: JoinRequestMock) {
-        // TODO: Implement approve logic
-        print("Approved: \(request.name)")
-    }
-    
-    private func rejectRequest(_ request: JoinRequestMock) {
-        // TODO: Implement reject logic
-        print("Rejected: \(request.name)")
+        .overlay(alignment: .bottom) {
+            if viewModel.showingToast {
+                ToastView(message: viewModel.toastMessage)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .animation(.easeInOut(duration: 0.3), value: viewModel.showingToast)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 70)
+            }
+        }
+        .alert("Error", isPresented: $viewModel.showingError) {
+            Button("OK", role: .cancel) { }
+            Button("Retry") {
+                viewModel.retryLoad()
+            }
+        } message: {
+            Text(viewModel.errorMessage)
+        }
+        .task {
+            await viewModel.loadJoinRequests()
+        }
     }
 }
 
 struct JoinRequestsHeader: View {
     let pendingCount: Int
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Join Requests")
                     .font(.title2)
                     .fontWeight(.bold)
-                
+
                 Spacer()
-                
+
                 // Pending count badge
-                Text("\(pendingCount)")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(pendingCount > 0 ? Color.blue : Color.gray)
-                    .clipShape(Circle())
+                if pendingCount > 0 {
+                    Text("\(pendingCount)")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.blue)
+                        .clipShape(Capsule())
+                }
             }
-            
+
             Text("Review employee requests to join your hotel")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
@@ -94,21 +126,21 @@ struct JoinRequestsEmptyState: View {
     var body: some View {
         VStack(spacing: 16) {
             Spacer()
-            
+
             Image(systemName: "person.badge.plus")
                 .font(.system(size: 60))
                 .foregroundColor(.secondary)
-            
+
             Text("No pending requests")
                 .font(.title2)
                 .foregroundColor(.secondary)
-            
+
             Text("New employee join requests will appear here for approval")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
-            
+
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -116,10 +148,6 @@ struct JoinRequestsEmptyState: View {
 }
 
 #Preview("With Requests") {
-    JoinRequestsList(hotelId: UUID())
-}
-
-#Preview("Loading") {
     JoinRequestsList(hotelId: UUID())
 }
 

@@ -12,29 +12,29 @@ class EmployeeJoinViewModel: ObservableObject {
     @Published var alertTitle = ""
     @Published var alertMessage = ""
     @Published var isSearching = false
+    @Published var hasPendingRequest = false
+    @Published var pendingHotelName: String?
     
     // MARK: - Dependencies
-    private let hotelService: HotelService
-    private let membershipService: MembershipService
+    private let serviceManager: ServiceManager
     private var navigationManager: NavigationManager?
-    
+
     // MARK: - Computed Properties
     var hasSearchResults: Bool {
         !availableHotels.isEmpty
     }
-    
+
     var canSearch: Bool {
         !hotelSearchText.trimmingCharacters(in: .whitespaces).isEmpty && !isSearching
     }
-    
+
     var showJoinButton: Bool {
-        selectedHotel != nil
+        selectedHotel != nil && !hasPendingRequest
     }
-    
+
     // MARK: - Initialization
-    init(hotelService: HotelService = HotelService(), membershipService: MembershipService = MembershipService()) {
-        self.hotelService = hotelService
-        self.membershipService = membershipService
+    init(serviceManager: ServiceManager = ServiceManager.shared) {
+        self.serviceManager = serviceManager
     }
     
     // MARK: - Setup
@@ -45,26 +45,26 @@ class EmployeeJoinViewModel: ObservableObject {
     // MARK: - Public Methods
     func searchHotels() async {
         guard canSearch else { return }
-        
+
         isSearching = true
-        
+
         do {
-            // Search for hotels using HotelService
-            availableHotels = try await hotelService.searchHotels(query: hotelSearchText.trimmingCharacters(in: .whitespaces))
-            
+            // Search for hotels using ServiceManager
+            availableHotels = try await serviceManager.hotelService.searchHotels(query: hotelSearchText.trimmingCharacters(in: .whitespaces))
+
             if availableHotels.isEmpty {
                 alertTitle = "No Results"
                 alertMessage = "No hotels found matching '\(hotelSearchText)'. Try a different search term."
                 showingAlert = true
             }
-            
+
         } catch {
             alertTitle = "Search Failed"
             alertMessage = error.localizedDescription
             showingAlert = true
             availableHotels = []
         }
-        
+
         isSearching = false
     }
     
@@ -74,28 +74,52 @@ class EmployeeJoinViewModel: ObservableObject {
     
     func requestToJoin() async {
         guard let hotel = selectedHotel else { return }
-        
-        isLoading = true
-        
-        do {
-            // Create join request using MembershipService
-            try await membershipService.createJoinRequest(hotelId: hotel.id)
-            
-            alertTitle = "Request Sent!"
-            alertMessage = "Your request to join '\(hotel.name)' has been sent. You'll be notified when a manager approves your request."
+
+        // Get user ID from auth service
+        guard let currentUser = serviceManager.authService.currentUser else {
+            alertTitle = "Error"
+            alertMessage = "You must be logged in to request to join a hotel"
             showingAlert = true
-            
+            return
+        }
+
+        let profileId = currentUser.id
+
+        isLoading = true
+
+        do {
+            // Set the current user ID in service manager if not already set
+            if serviceManager.currentUserId == nil {
+                serviceManager.setCurrentUser(profileId)
+            }
+
+            // Create join request using JoinRequestService
+            _ = try await serviceManager.joinRequestService.createJoinRequest(
+                profileId: profileId,
+                hotelId: hotel.id
+            )
+
+            // Set pending state
+            hasPendingRequest = true
+            pendingHotelName = hotel.name
+
+            // Navigate to pending approval screen
+            navigationManager?.navigate(to: .joinRequestPending(hotelName: hotel.name))
+
             // Clear selection and search after successful request
             clearSearch()
-            
-            // TODO: Navigate to pending approval screen or dashboard
-            
+
+        } catch let error as JoinRequestServiceError {
+            // Handle specific join request errors
+            alertTitle = "Request Failed"
+            alertMessage = error.localizedDescription
+            showingAlert = true
         } catch {
             alertTitle = "Request Failed"
             alertMessage = error.localizedDescription
             showingAlert = true
         }
-        
+
         isLoading = false
     }
     

@@ -3,23 +3,6 @@ import SwiftUI
 
 // MARK: - Mock Models for UI Development
 
-enum JoinRequestStatus: String, CaseIterable {
-    case pending = "pending"
-    case approved = "approved"
-    case rejected = "rejected"
-    
-    var displayName: String {
-        switch self {
-        case .pending:
-            return "Pending"
-        case .approved:
-            return "Approved"
-        case .rejected:
-            return "Rejected"
-        }
-    }
-}
-
 struct JoinRequestMock: Identifiable {
     let id = UUID()
     let name: String

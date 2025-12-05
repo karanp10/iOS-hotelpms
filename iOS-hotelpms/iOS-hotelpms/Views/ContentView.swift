@@ -14,6 +14,7 @@ enum NavigationDestination: Hashable {
     case emailVerification(email: String)
     case managerHotelSetup
     case employeeJoin
+    case joinRequestPending(hotelName: String)
     case hotelSelection
     case roomSetup(hotelId: UUID)
     case roomDashboard(hotelId: UUID, roomId: UUID? = nil)
@@ -41,6 +42,8 @@ struct ContentView: View {
                         ManagerHotelSetupView()
                     case .employeeJoin:
                         EmployeeJoinView()
+                    case .joinRequestPending(let hotelName):
+                        JoinRequestPendingView(hotelName: hotelName)
                     case .hotelSelection:
                         HotelSelectionView()
                     case .roomSetup(let hotelId):
