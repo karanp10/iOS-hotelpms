@@ -83,7 +83,7 @@ class JoinRequestMutations {
                 status: JoinRequestStatus.accepted.rawValue
             )
 
-            let _: [String: String] = try await supabaseClient
+            let _: [[String: AnyJSON]] = try await supabaseClient
                 .from("join_requests")
                 .update(joinRequestUpdate)
                 .eq("id", value: requestId)
@@ -96,7 +96,7 @@ class JoinRequestMutations {
                 role: role.rawValue
             )
 
-            let _: [String: String] = try await supabaseClient
+            let _: [[String: AnyJSON]] = try await supabaseClient
                 .from("hotel_memberships")
                 .update(membershipUpdate)
                 .eq("profile_id", value: joinRequest.profileId)
@@ -128,7 +128,7 @@ class JoinRequestMutations {
                 status: JoinRequestStatus.rejected.rawValue
             )
 
-            let _: [String: String] = try await supabaseClient
+            let _: [[String: AnyJSON]] = try await supabaseClient
                 .from("join_requests")
                 .update(joinRequestUpdate)
                 .eq("id", value: requestId)
@@ -141,7 +141,7 @@ class JoinRequestMutations {
                 role: nil
             )
 
-            let _: [String: String] = try await supabaseClient
+            let _: [[String: AnyJSON]] = try await supabaseClient
                 .from("hotel_memberships")
                 .update(membershipUpdate)
                 .eq("profile_id", value: joinRequest.profileId)

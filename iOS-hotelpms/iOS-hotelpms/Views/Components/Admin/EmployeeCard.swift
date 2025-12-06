@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct EmployeeCard: View {
-    let employee: EmployeeMock
+    let employee: HotelEmployee
     let isSelected: Bool
     let onTap: () -> Void
 
@@ -17,11 +17,11 @@ struct EmployeeCard: View {
                             .font(.title3)
                             .fontWeight(.semibold)
                             .foregroundColor(roleColor)
-                    )
+                )
 
                 // Employee info
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(employee.name)
+                    Text(employee.fullName)
                         .font(.headline)
                         .foregroundColor(.primary)
 
@@ -68,7 +68,7 @@ struct EmployeeCard: View {
 
 #Preview("Single Employee") {
     EmployeeCard(
-        employee: MockData.employees[0],
+        employee: .preview(role: .manager, firstName: "Alex", lastName: "Thompson"),
         isSelected: false,
         onTap: {}
     )
@@ -78,7 +78,13 @@ struct EmployeeCard: View {
 
 #Preview("Different Roles") {
     VStack(spacing: 12) {
-        ForEach(MockData.employees.prefix(5)) { employee in
+        ForEach([
+            HotelEmployee.preview(role: .admin, firstName: "Lisa", lastName: "Park"),
+            HotelEmployee.preview(role: .manager, firstName: "Jordan", lastName: "Smith"),
+            HotelEmployee.preview(role: .frontDesk, firstName: "Taylor", lastName: "Wilson"),
+            HotelEmployee.preview(role: .housekeeping, firstName: "Maria", lastName: "Garcia"),
+            HotelEmployee.preview(role: .maintenance, firstName: "Robert", lastName: "Davis")
+        ]) { employee in
             EmployeeCard(
                 employee: employee,
                 isSelected: false,
@@ -93,13 +99,13 @@ struct EmployeeCard: View {
 #Preview("Selected State") {
     VStack(spacing: 12) {
         EmployeeCard(
-            employee: MockData.employees[0],
+            employee: .preview(role: .manager, firstName: "Alex", lastName: "Thompson"),
             isSelected: true,
             onTap: {}
         )
 
         EmployeeCard(
-            employee: MockData.employees[1],
+            employee: .preview(role: .admin, firstName: "Lisa", lastName: "Park"),
             isSelected: false,
             onTap: {}
         )
@@ -107,3 +113,30 @@ struct EmployeeCard: View {
     .padding()
     .background(Color(.systemGroupedBackground))
 }
+
+#if DEBUG
+extension HotelEmployee {
+    static func preview(
+        role: HotelRole,
+        firstName: String,
+        lastName: String,
+        email: String? = nil
+    ) -> HotelEmployee {
+        HotelEmployee(
+            id: UUID(),
+            profileId: UUID(),
+            hotelId: UUID(),
+            role: role,
+            status: .approved,
+            createdAt: Date(),
+            profile: Profile(
+                id: UUID(),
+                firstName: firstName,
+                lastName: lastName,
+                email: email ?? "\(firstName.lowercased()).\(lastName.lowercased())@hotel.com",
+                createdAt: Date()
+            )
+        )
+    }
+}
+#endif

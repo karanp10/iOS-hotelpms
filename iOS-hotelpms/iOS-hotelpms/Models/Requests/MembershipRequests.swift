@@ -41,3 +41,7 @@ struct UpdateMembershipStatusRequest: Codable {
         case role
     }
 }
+
+struct UpdateMembershipRoleRequest: Codable {
+    let role: String
+}

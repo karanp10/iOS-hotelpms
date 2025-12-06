@@ -1,13 +1,24 @@
 import SwiftUI
 
 struct EmployeeDetailPanel: View {
-    let employee: EmployeeMock
+    let employee: HotelEmployee
+    let isProcessing: Bool
+    let onChangeRole: (HotelRole) -> Void
+    let onRemove: () -> Void
     @State private var showingRoleSheet = false
     @State private var showingRemoveAlert = false
     @State private var selectedRole: HotelRole
 
-    init(employee: EmployeeMock) {
+    init(
+        employee: HotelEmployee,
+        isProcessing: Bool,
+        onChangeRole: @escaping (HotelRole) -> Void,
+        onRemove: @escaping () -> Void
+    ) {
         self.employee = employee
+        self.isProcessing = isProcessing
+        self.onChangeRole = onChangeRole
+        self.onRemove = onRemove
         _selectedRole = State(initialValue: employee.role)
     }
 
@@ -28,7 +39,7 @@ struct EmployeeDetailPanel: View {
 
                 // Employee info
                 VStack(spacing: 8) {
-                    Text(employee.name)
+                    Text(employee.fullName)
                         .font(.title2)
                         .fontWeight(.bold)
 
@@ -56,7 +67,7 @@ struct EmployeeDetailPanel: View {
 
                     DetailRow(
                         label: "Status",
-                        value: employee.isActive ? "Active" : "Inactive"
+                        value: employee.status.displayName
                     )
 
                     DetailRow(
@@ -81,6 +92,7 @@ struct EmployeeDetailPanel: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
+                    .disabled(isProcessing)
 
                     Button(action: {
                         showingRemoveAlert = true
@@ -93,18 +105,22 @@ struct EmployeeDetailPanel: View {
                     }
                     .buttonStyle(.bordered)
                     .foregroundColor(.red)
+                    .disabled(isProcessing)
                 }
                 .padding(.horizontal)
 
                 Spacer()
             }
         }
+        .onChange(of: employee.role) { newRole in
+            selectedRole = newRole
+        }
         .sheet(isPresented: $showingRoleSheet) {
             RoleSelectionSheet(
                 selectedRole: $selectedRole,
-                employeeName: employee.name,
+                employeeName: employee.fullName,
                 onSave: {
-                    print("Role changed to: \(selectedRole.displayName)")
+                    onChangeRole(selectedRole)
                     showingRoleSheet = false
                 },
                 onCancel: {
@@ -112,15 +128,16 @@ struct EmployeeDetailPanel: View {
                     showingRoleSheet = false
                 }
             )
-            .presentationDetents([.medium, .large])
+            .presentationDetents([.large])
         }
         .alert("Remove Employee", isPresented: $showingRemoveAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Remove", role: .destructive) {
-                print("Removed employee: \(employee.name)")
+                onRemove()
+                showingRemoveAlert = false
             }
         } message: {
-            Text("Are you sure you want to remove \(employee.name) from this hotel? This action cannot be undone.")
+            Text("Are you sure you want to remove \(employee.fullName) from this hotel? This action cannot be undone.")
         }
     }
 
@@ -139,7 +156,8 @@ struct EmployeeDetailPanel: View {
         }
     }
 
-    private func formatDate(_ date: Date) -> String {
+    private func formatDate(_ date: Date?) -> String {
+        guard let date else { return "Unknown" }
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
@@ -167,13 +185,28 @@ struct DetailRow: View {
 }
 
 #Preview("Manager") {
-    EmployeeDetailPanel(employee: MockData.employees[0])
+    EmployeeDetailPanel(
+        employee: .preview(role: .manager, firstName: "Alex", lastName: "Thompson"),
+        isProcessing: false,
+        onChangeRole: { _ in },
+        onRemove: {}
+    )
 }
 
 #Preview("Front Desk") {
-    EmployeeDetailPanel(employee: MockData.employees[2])
+    EmployeeDetailPanel(
+        employee: .preview(role: .frontDesk, firstName: "Jordan", lastName: "Smith"),
+        isProcessing: false,
+        onChangeRole: { _ in },
+        onRemove: {}
+    )
 }
 
 #Preview("Housekeeping") {
-    EmployeeDetailPanel(employee: MockData.employees[4])
+    EmployeeDetailPanel(
+        employee: .preview(role: .housekeeping, firstName: "Maria", lastName: "Garcia"),
+        isProcessing: false,
+        onChangeRole: { _ in },
+        onRemove: {}
+    )
 }

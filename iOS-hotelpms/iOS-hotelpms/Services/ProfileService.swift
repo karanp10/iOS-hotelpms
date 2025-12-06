@@ -32,7 +32,7 @@ class ProfileService: ObservableObject {
     /// NOTE: For signup flow, profiles are now auto-created via database trigger when email is verified
     /// This method is kept for other use cases (admin operations, etc.)
     func createProfile(firstName: String, lastName: String, email: String) async throws -> Profile {
-        guard let userId = supabase.auth.currentUser?.id else {
+        guard supabase.auth.currentUser?.id != nil else {
             throw ProfileServiceError.userNotAuthenticated
         }
         

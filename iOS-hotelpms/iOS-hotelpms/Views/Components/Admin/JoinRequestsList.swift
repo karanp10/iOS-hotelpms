@@ -62,7 +62,7 @@ struct JoinRequestsList: View {
                     viewModel.cancelApproval()
                 }
             )
-            .presentationDetents([.medium])
+            .presentationDetents([.large])
         }
         .overlay(alignment: .bottom) {
             if viewModel.showingToast {

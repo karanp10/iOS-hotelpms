@@ -2,47 +2,50 @@ import SwiftUI
 
 struct EmployeesList: View {
     let hotelId: UUID
+    @StateObject private var viewModel: EmployeesViewModel
 
-    @State private var searchText = ""
-    @State private var selectedEmployee: EmployeeMock?
-    @State private var showingDetailPanel = false
-    @State private var isLoading = false
-
-    // Using mock data for UI-first implementation
-    private var employees: [EmployeeMock] {
-        MockData.employees
-    }
-
-    private var filteredEmployees: [EmployeeMock] {
-        if searchText.isEmpty {
-            return employees
-        }
-        return employees.filter { employee in
-            employee.name.localizedCaseInsensitiveContains(searchText) ||
-            employee.email.localizedCaseInsensitiveContains(searchText) ||
-            employee.role.displayName.localizedCaseInsensitiveContains(searchText)
-        }
-    }
-
-    private var employeesByRole: [HotelRole: [EmployeeMock]] {
-        Dictionary(grouping: filteredEmployees) { $0.role }
+    init(hotelId: UUID) {
+        self.hotelId = hotelId
+        _viewModel = StateObject(wrappedValue: EmployeesViewModel(hotelId: hotelId))
     }
 
     var body: some View {
         ZStack {
-            if isLoading {
+            if viewModel.isLoading {
                 loadingView
-            } else if employees.isEmpty {
+            } else if viewModel.employees.isEmpty {
                 emptyView
             } else {
                 contentView
             }
         }
         .background(Color(.systemGroupedBackground))
-        .sheet(isPresented: $showingDetailPanel) {
-            if let employee = selectedEmployee {
-                EmployeeDetailPanel(employee: employee)
+        .sheet(item: $viewModel.selectedEmployee) { employee in
+            EmployeeDetailPanel(
+                employee: employee,
+                isProcessing: viewModel.isProcessing(employee.id),
+                onChangeRole: { role in
+                    Task {
+                        await viewModel.updateRole(for: employee.id, to: role)
+                    }
+                },
+                onRemove: {
+                    Task {
+                        await viewModel.removeEmployee(employee)
+                    }
+                }
+            )
+        }
+        .alert("Error", isPresented: $viewModel.showingError) {
+            Button("OK", role: .cancel) { }
+            Button("Retry") {
+                viewModel.retryLoad()
             }
+        } message: {
+            Text(viewModel.errorMessage)
+        }
+        .task {
+            await viewModel.loadEmployees()
         }
     }
 
@@ -57,7 +60,7 @@ struct EmployeesList: View {
 
                     Spacer()
 
-                    Text("\(employees.count)")
+                    Text("\(viewModel.totalCount)")
                         .font(.title3)
                         .fontWeight(.semibold)
                         .foregroundColor(.white)
@@ -74,11 +77,11 @@ struct EmployeesList: View {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.secondary)
 
-                    TextField("Search employees...", text: $searchText)
+                    TextField("Search employees...", text: $viewModel.searchText)
                         .textFieldStyle(.plain)
 
-                    if !searchText.isEmpty {
-                        Button(action: { searchText = "" }) {
+                    if !viewModel.searchText.isEmpty {
+                        Button(action: { viewModel.searchText = "" }) {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundColor(.secondary)
                         }
@@ -94,17 +97,16 @@ struct EmployeesList: View {
             // Employee list grouped by role
             ScrollView {
                 LazyVStack(spacing: 20, pinnedViews: .sectionHeaders) {
-                    ForEach(sortedRoles, id: \.self) { role in
-                        if let roleEmployees = employeesByRole[role], !roleEmployees.isEmpty {
+                    ForEach(viewModel.sortedRoles, id: \.self) { role in
+                        if let roleEmployees = viewModel.employeesByRole[role], !roleEmployees.isEmpty {
                             Section {
                                 VStack(spacing: 12) {
                                     ForEach(roleEmployees) { employee in
                                         EmployeeCard(
                                             employee: employee,
-                                            isSelected: selectedEmployee?.id == employee.id,
+                                            isSelected: viewModel.selectedEmployee?.id == employee.id,
                                             onTap: {
-                                                selectedEmployee = employee
-                                                showingDetailPanel = true
+                                                viewModel.selectEmployee(employee)
                                             }
                                         )
                                     }
@@ -133,7 +135,7 @@ struct EmployeesList: View {
                 .padding(.bottom, 20)
             }
 
-            if filteredEmployees.isEmpty && !searchText.isEmpty {
+            if viewModel.filteredEmployees.isEmpty && !viewModel.searchText.isEmpty {
                 searchEmptyView
             }
         }
@@ -180,18 +182,12 @@ struct EmployeesList: View {
                 .font(.title3)
                 .fontWeight(.semibold)
 
-            Text("No employees match '\(searchText)'")
+            Text("No employees match '\(viewModel.searchText)'")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.top, -100)
-    }
-
-    private var sortedRoles: [HotelRole] {
-        // Sort roles in logical order: Admin, Manager, Front Desk, Housekeeping, Maintenance
-        let order: [HotelRole] = [.admin, .manager, .frontDesk, .housekeeping, .maintenance]
-        return order.filter { employeesByRole[$0] != nil }
     }
 }
 
