@@ -132,11 +132,14 @@ struct LoginView: View {
                     // All hotels are configured - check user role and navigate to appropriate dashboard
                     if let firstHotel = hotelsWithRoomCounts.first {
                         let userRole = await serviceManager.getUserRole(for: firstHotel.id)
-                        
+
                         if userRole?.hasAdminAccess == true {
                             navigationManager.navigate(to: .adminDashboard(hotelId: firstHotel.id))
+                        } else if let role = userRole {
+                            navigationManager.navigate(to: .employeeDashboard(hotelId: firstHotel.id, userRole: role))
                         } else {
-                            navigationManager.navigate(to: .roomDashboard(hotelId: firstHotel.id))
+                            alertMessage = "Unable to determine user role."
+                            showingAlert = true
                         }
                     } else {
                         alertMessage = "No hotels found."

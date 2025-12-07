@@ -128,5 +128,66 @@ struct Room: Codable, Identifiable, Hashable {
         // Standard hotel convention: room 205 is on floor 2
         return roomNumber / 100
     }
+
+    // MARK: - Housekeeping Helpers
+
+    /// Computed property for cleaning priority
+    var cleaningPriority: CleaningPriority {
+        return CleaningPriority.priority(for: self)
+    }
+
+    /// Check if room can start cleaning (dirty or checked out)
+    func canStartCleaning() -> Bool {
+        return cleaningStatus == .dirty || occupancyStatus == .checkedOut
+    }
+
+    /// Check if room can be marked as ready (currently in progress)
+    func canMarkReady() -> Bool {
+        return cleaningStatus == .cleaningInProgress
+    }
+
+    /// Check if room is in the cleaning workflow (not ready)
+    var needsCleaning: Bool {
+        return cleaningStatus != .ready
+    }
+
+    // MARK: - Maintenance Helpers
+
+    /// Check if room has maintenance-related flags
+    var hasMaintenanceFlag: Bool {
+        return flags.contains(.maintenanceRequired) ||
+               flags.contains(.outOfOrder) ||
+               flags.contains(.outOfService)
+    }
+
+    /// Check if room is out of service
+    var isOutOfService: Bool {
+        return flags.contains(.outOfService)
+    }
+
+    /// Get only maintenance-related flags
+    func maintenanceFlags() -> [RoomFlag] {
+        return flags.filter {
+            $0 == .maintenanceRequired || $0 == .outOfOrder || $0 == .outOfService
+        }
+    }
+
+    // MARK: - Front Desk Helpers
+
+    /// Check if room is available for assignment (vacant and ready)
+    var isAvailable: Bool {
+        return occupancyStatus == .vacant && cleaningStatus == .ready
+    }
+
+    /// Check if guest can check in
+    func canCheckIn() -> Bool {
+        return (occupancyStatus == .vacant || occupancyStatus == .assigned) &&
+               cleaningStatus == .ready
+    }
+
+    /// Check if guest can check out
+    func canCheckOut() -> Bool {
+        return occupancyStatus == .occupied || occupancyStatus == .stayover
+    }
 }
 
