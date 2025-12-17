@@ -4,11 +4,33 @@ struct CleaningRoomCard: View {
     let room: Room
     let onStartCleaning: (() -> Void)?
     let onMarkReady: (() -> Void)?
+    let onUndo: (() -> Void)?
+    let isInUndoMode: Bool
+    let onAddNote: (() -> Void)?
+    let noteCount: Int?
+
+    init(
+        room: Room,
+        onStartCleaning: (() -> Void)?,
+        onMarkReady: (() -> Void)?,
+        onUndo: (() -> Void)? = nil,
+        isInUndoMode: Bool = false,
+        onAddNote: (() -> Void)? = nil,
+        noteCount: Int? = nil
+    ) {
+        self.room = room
+        self.onStartCleaning = onStartCleaning
+        self.onMarkReady = onMarkReady
+        self.onUndo = onUndo
+        self.isInUndoMode = isInUndoMode
+        self.onAddNote = onAddNote
+        self.noteCount = noteCount
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             // Header Row
-            HStack {
+            HStack(alignment: .top) {
                 // Room Number
                 HStack(spacing: 8) {
                     Image(systemName: "bed.double.fill")
@@ -28,56 +50,25 @@ struct CleaningRoomCard: View {
 
                 Spacer()
 
-                // Priority Indicator
-                priorityBadge
+                statusChip
             }
 
-            // Status Row
-            HStack(spacing: 8) {
-                // Cleaning Status
-                CleaningStatusChip(
-                    text: room.cleaningStatus.displayName,
-                    color: Color(room.cleaningStatus.color),
-                    icon: room.cleaningStatus.systemImage
-                )
+            Spacer()
 
-                // Occupancy Status
-                CleaningStatusChip(
-                    text: room.occupancyStatus.displayName,
-                    color: Color(room.occupancyStatus.color),
-                    icon: nil
-                )
-
-                Spacer()
-            }
-
-            // Flags (if any)
-            if room.hasFlags {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(room.flags, id: \.self) { flag in
-                            CleaningFlagChip(flag: flag)
-                        }
+            // Action row
+            HStack {
+                if isInUndoMode, let undoAction = onUndo {
+                    Button(action: undoAction) {
+                        Label("UNDO", systemImage: "arrow.uturn.backward")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.orange)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
                     }
-                }
-            }
-
-            // Notes Preview (if any)
-            if let preview = room.notesPreview {
-                HStack(spacing: 6) {
-                    Image(systemName: "note.text")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(preview)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
-            }
-
-            // Action Buttons
-            HStack(spacing: 8) {
-                if let startAction = onStartCleaning, room.canStartCleaning() {
+                } else if let startAction = onStartCleaning, room.canStartCleaning() {
                     Button(action: startAction) {
                         Label("Start Cleaning", systemImage: "play.fill")
                             .font(.subheadline)
@@ -88,9 +79,7 @@ struct CleaningRoomCard: View {
                             .foregroundColor(.white)
                             .cornerRadius(8)
                     }
-                }
-
-                if let readyAction = onMarkReady, room.canMarkReady() {
+                } else if let readyAction = onMarkReady, room.canMarkReady() {
                     Button(action: readyAction) {
                         Label("Mark Ready", systemImage: "checkmark.circle.fill")
                             .font(.subheadline)
@@ -102,39 +91,78 @@ struct CleaningRoomCard: View {
                             .cornerRadius(8)
                     }
                 }
+
+                if let noteAction = onAddNote {
+                    Button(action: noteAction) {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "note.text")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .frame(width: 52, height: 36)
+
+                            // Badge overlay - only shown when noteCount > 0
+                            if let count = noteCount, count > 0 {
+                                Text("\(count)")
+                                    .font(.caption2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .frame(minWidth: 18, minHeight: 18)
+                                    .background(
+                                        Circle()
+                                            .fill(Color.red)
+                                    )
+                                    .offset(x: 8, y: -4)
+                            }
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                }
             }
         }
-        .padding()
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.secondarySystemGroupedBackground))
+                .fill(backgroundColorForStatus)
         )
+        .frame(minHeight: 104)
     }
 
-    // MARK: - Priority Badge
+    // MARK: - Computed Properties
+
+    private var backgroundColorForStatus: Color {
+        switch room.cleaningStatus {
+        case .dirty:
+            return Color.red.opacity(0.1)
+        case .cleaningInProgress:
+            return Color.yellow.opacity(0.15)
+        case .ready:
+            return Color.green.opacity(0.1)
+        }
+    }
+
+    // MARK: - Status Chip
 
     @ViewBuilder
-    private var priorityBadge: some View {
-        let priority = room.cleaningPriority
-
-        if priority != .none {
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(Color(priority.color))
-                    .frame(width: 8, height: 8)
-
-                Text(priority.displayName)
-                    .font(.caption2)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
+    private var statusChip: some View {
+        let (label, colorName): (String, String) = {
+            switch room.cleaningStatus {
+            case .dirty:
+                return ("Dirty", "red")
+            case .cleaningInProgress:
+                return ("In Progress", "yellow")
+            case .ready:
+                return ("Ready", "green")
             }
+        }()
+
+        Text(label)
+            .font(.caption)
+            .fontWeight(.semibold)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(Color(priority.color).opacity(0.15))
-            )
-        }
+            .background(Capsule().fill(Color(colorName).opacity(0.15)))
+            .foregroundColor(Color(colorName))
     }
 }
 
@@ -201,7 +229,9 @@ private struct CleaningFlagChip: View {
                 flags: [.dnd]
             ),
             onStartCleaning: {},
-            onMarkReady: nil
+            onMarkReady: nil,
+            onAddNote: nil,
+            noteCount: 0
         )
 
         // In progress room
@@ -215,7 +245,9 @@ private struct CleaningFlagChip: View {
                 flags: []
             ),
             onStartCleaning: nil,
-            onMarkReady: {}
+            onMarkReady: {},
+            onAddNote: nil,
+            noteCount: 2
         )
 
         // Ready room
@@ -229,7 +261,9 @@ private struct CleaningFlagChip: View {
                 flags: []
             ),
             onStartCleaning: nil,
-            onMarkReady: nil
+            onMarkReady: nil,
+            onAddNote: nil,
+            noteCount: 1
         )
     }
     .padding()

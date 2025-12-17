@@ -43,7 +43,12 @@ final class HousekeepingBoardViewModel: ObservableObject {
     var dirtyRooms: [Room] {
         filteredRooms
             .filter { $0.cleaningStatus == .dirty || $0.occupancyStatus == .checkedOut }
-            .sorted { $0.cleaningPriority > $1.cleaningPriority }
+            .sorted {
+                if $0.floorNumber == $1.floorNumber {
+                    return $0.roomNumber < $1.roomNumber
+                }
+                return $0.floorNumber < $1.floorNumber
+            }
     }
 
     /// Rooms currently being cleaned

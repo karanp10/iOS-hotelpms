@@ -13,48 +13,93 @@ struct EmployeeTabView: View {
     }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            // Primary Tab (Role-Specific)
-            primaryTabContent
-                .tabItem {
-                    Label(
-                        EmployeeTab.primary.label(for: userRole),
-                        systemImage: EmployeeTab.primary.systemImage(for: userRole)
-                    )
-                }
-                .tag(EmployeeTab.primary)
+        if userRole == .housekeeping {
+            TabView(selection: $selectedTab) {
+                // Queued first for housekeeping
+                requestsTabContent
+                    .tabItem {
+                        Label(
+                            EmployeeTab.requests.label(for: userRole),
+                            systemImage: EmployeeTab.requests.systemImage(for: userRole)
+                        )
+                    }
+                    .tag(EmployeeTab.requests)
 
-            // Activity Tab (Filtered Recent Updates)
-            activityTabContent
-                .tabItem {
-                    Label(
-                        EmployeeTab.activity.label(for: userRole),
-                        systemImage: EmployeeTab.activity.systemImage(for: userRole)
-                    )
-                }
-                .tag(EmployeeTab.activity)
+                // Activity second
+                activityTabContent
+                    .tabItem {
+                        Label(
+                            EmployeeTab.activity.label(for: userRole),
+                            systemImage: EmployeeTab.activity.systemImage(for: userRole)
+                        )
+                    }
+                    .tag(EmployeeTab.activity)
 
-            // Requests/Tasks Tab (Queued Work)
-            requestsTabContent
-                .tabItem {
-                    Label(
-                        EmployeeTab.requests.label(for: userRole),
-                        systemImage: EmployeeTab.requests.systemImage(for: userRole)
-                    )
-                }
-                .tag(EmployeeTab.requests)
+                // Board/My Rooms third
+                primaryTabContent
+                    .tabItem {
+                        Label(
+                            EmployeeTab.primary.label(for: userRole),
+                            systemImage: EmployeeTab.primary.systemImage(for: userRole)
+                        )
+                    }
+                    .tag(EmployeeTab.primary)
 
-            // Account Tab
-            AccountSettingsView()
-                .tabItem {
-                    Label(
-                        EmployeeTab.account.label(for: userRole),
-                        systemImage: EmployeeTab.account.systemImage(for: userRole)
-                    )
-                }
-                .tag(EmployeeTab.account)
+                // Account stays last
+                AccountSettingsView()
+                    .tabItem {
+                        Label(
+                            EmployeeTab.account.label(for: userRole),
+                            systemImage: EmployeeTab.account.systemImage(for: userRole)
+                        )
+                    }
+                    .tag(EmployeeTab.account)
+            }
+            .navigationBarHidden(true)
+        } else {
+            TabView(selection: $selectedTab) {
+                // Primary Tab (Role-Specific)
+                primaryTabContent
+                    .tabItem {
+                        Label(
+                            EmployeeTab.primary.label(for: userRole),
+                            systemImage: EmployeeTab.primary.systemImage(for: userRole)
+                        )
+                    }
+                    .tag(EmployeeTab.primary)
+
+                // Activity Tab (Filtered Recent Updates)
+                activityTabContent
+                    .tabItem {
+                        Label(
+                            EmployeeTab.activity.label(for: userRole),
+                            systemImage: EmployeeTab.activity.systemImage(for: userRole)
+                        )
+                    }
+                    .tag(EmployeeTab.activity)
+
+                // Requests/Tasks Tab (Queued Work)
+                requestsTabContent
+                    .tabItem {
+                        Label(
+                            EmployeeTab.requests.label(for: userRole),
+                            systemImage: EmployeeTab.requests.systemImage(for: userRole)
+                        )
+                    }
+                    .tag(EmployeeTab.requests)
+
+                // Account Tab
+                AccountSettingsView()
+                    .tabItem {
+                        Label(
+                            EmployeeTab.account.label(for: userRole),
+                            systemImage: EmployeeTab.account.systemImage(for: userRole)
+                        )
+                    }
+                    .tag(EmployeeTab.account)
+            }
+            .navigationBarHidden(true)
         }
-        .navigationBarHidden(true)
     }
 
     // MARK: - Tab Content Views
@@ -78,8 +123,12 @@ struct EmployeeTabView: View {
 
     @ViewBuilder
     private var activityTabContent: some View {
-        // TODO: Replace with EmployeeActivityView
-        placeholderView(title: "Activity", subtitle: "Recent updates filtered by role")
+        switch userRole {
+        case .housekeeping:
+            HousekeepingActivityView(hotelId: hotelId)
+        default:
+            placeholderView(title: "Activity", subtitle: "Recent updates filtered by role")
+        }
     }
 
     @ViewBuilder
